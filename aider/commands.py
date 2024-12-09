@@ -164,6 +164,27 @@ class Commands:
 
     def cmd_web(self, args, return_content=False):
         "Scrape a webpage, convert to markdown and send in a message"
+        return self._scrape_web(args, return_content)
+
+    def cmd_docs(self, args):
+        "Look up Python documentation using the official docs website"
+        if not args.strip():
+            self.io.tool_error("Please provide a Python topic to look up.")
+            return
+
+        base_url = "https://docs.python.org/3/search.html?q="
+        search_url = base_url + args.strip().replace(" ", "+")
+        
+        self.io.tool_output(f"Looking up documentation for: {args.strip()}")
+        content = self._scrape_web(search_url, return_content=True)
+        
+        if content:
+            self.io.tool_output("Found documentation:")
+            self.io.tool_output(content)
+        else:
+            self.io.tool_output("No documentation found or unable to access the page.")
+
+    def _scrape_web(self, args, return_content=False):
 
         url = args.strip()
         if not url:
@@ -175,6 +196,7 @@ class Commands:
             res = install_playwright(self.io)
             if not res:
                 self.io.tool_warning("Unable to initialize playwright.")
+                return
 
             self.scraper = Scraper(
                 print_error=self.io.tool_error, playwright_available=res, verify_ssl=self.verify_ssl
