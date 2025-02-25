@@ -37,7 +37,6 @@ from aider.watch import FileWatcher
 
 from .dump import dump  # noqa: F401
 
-
 def check_config_files_for_yes(config_files):
     found = False
     for config_file in config_files:
