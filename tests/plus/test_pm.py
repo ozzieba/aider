@@ -1,4 +1,6 @@
 import json
+import threading
+import time
 import unittest
 from pathlib import Path
 from unittest.mock import MagicMock, patch
@@ -321,3 +323,56 @@ class TestPM(unittest.TestCase):
             # Verify task status and state saving
             self.assertEqual(task.status, TaskStatus.COMPLETED)
             pm.save_state.assert_called()
+
+    @patch("aider.plus.pm.AIEngineeringTeam")
+    @patch("aider.coders.Coder.create")
+    def test_execute_plan_in_parallel(self, MockCoderCreate, MockTeam):
+        with GitTemporaryDirectory() as repo_dir:
+            task_a = Task(name="Task A")
+            task_b = Task(name="Task B")
+            task_c = Task(name="Task C", dependencies=[task_a.id, task_b.id])
+
+            pm = AiderPlusPM(
+                repo=MagicMock(),
+                root=repo_dir,
+                main_model=MagicMock(),
+                io=MagicMock(),
+                team_config={},
+            )
+            pm.state.tasks = [task_a, task_b, task_c]
+            pm.save_state = MagicMock()
+
+            # Mock coder execution
+            execution_times = {}
+            lock = threading.Lock()
+
+            def mock_run(with_message):
+                task_name = with_message
+                start_time = time.time()
+                time.sleep(0.1)  # Simulate work
+                end_time = time.time()
+                with lock:
+                    execution_times[task_name] = (start_time, end_time)
+
+            mock_coder = MagicMock()
+            mock_coder.run.side_effect = mock_run
+            MockCoderCreate.return_value = mock_coder
+
+            pm.execute_plan()
+
+            # Verify execution times
+            self.assertIn("Task A", execution_times)
+            self.assertIn("Task B", execution_times)
+            self.assertIn("Task C", execution_times)
+
+            start_a, end_a = execution_times["Task A"]
+            start_b, end_b = execution_times["Task B"]
+            start_c, _ = execution_times["Task C"]
+
+            # Check for parallel execution of A and B (overlap)
+            self.assertTrue(start_b < end_a)
+            self.assertTrue(start_a < end_b)
+
+            # Check that C starts after both A and B finish
+            self.assertTrue(start_c > end_a)
+            self.assertTrue(start_c > end_b)

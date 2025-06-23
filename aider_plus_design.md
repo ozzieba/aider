@@ -746,7 +746,7 @@ This section provides a granular, step-by-step implementation plan for building 
 
 **Goal:** Implement the "Team Management" aspect of Aider+, allowing it to use specialized agents for different tasks.
 
-**Step 7: Introduce `AIEngineeringTeam` and role-based model configuration. (IN PROGRESS)**
+**Step 7: Introduce `AIEngineeringTeam` and role-based model configuration. (DONE)**
 *   **Action:**
     1.  Create a new `aider/plus/team.py` file with an `AIEngineeringTeam` class. This class will manage a collection of `aider.models.Model` instances based on roles ('coder', 'reviewer', 'test_writer').
     2.  The `AIEngineeringTeam` constructor will accept a main model and role-specific model names from a new configuration section in `.aider.conf.yml`. It will provide methods like `get_coder()`, `get_reviewer()`, etc.
@@ -754,6 +754,23 @@ This section provides a granular, step-by-step implementation plan for building 
 *   **Tests:**
     1.  Create `tests/plus/test_team.py` to test `AIEngineeringTeam`. Verify that it correctly loads models based on configuration.
     2.  Update `tests/plus/test_pm.py`'s `test_execute_plan_with_tdd_and_critique` to mock `AIEngineeringTeam` and verify that the correct role-based methods (`get_coder`, `get_reviewer`, etc.) are called for each step of the TDD cycle.
+
+### Phase 3: The Autonomous Project Manager
+
+**Goal:** Enable true autonomy and parallelism.
+
+**Step 8: Implement parallel task execution. (IN PROGRESS)**
+*   **Action:**
+    1.  Modify `AiderPlusPM.execute_plan()` to identify tasks with no pending dependencies.
+    2.  Use a thread pool or `asyncio` to execute these tasks in parallel.
+    3.  Update `WorkflowState` to handle the status of multiple `in_progress` tasks.
+    4.  Ensure that task completion correctly resolves dependencies, unlocking subsequent tasks for execution.
+*   **Tests:**
+    1.  In `tests/plus/test_pm.py`, add a new test `test_execute_plan_in_parallel`.
+    2.  Create a `WorkflowState` with a mix of independent and dependent tasks (e.g., Task C depends on A and B).
+    3.  Mock the agent execution (e.g., `Coder.run`) to include a `time.sleep()` to simulate work, and use a side effect to track the start and end times of each task.
+    4.  Verify that independent tasks (A and B) run concurrently (their execution times overlap).
+    5.  Verify that dependent tasks (C) only start after their dependencies (A and B) are complete.
 
 ## Glossary
 
