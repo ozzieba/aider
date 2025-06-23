@@ -231,7 +231,9 @@ class TestPM(unittest.TestCase):
             # Mocks for Coder instances
             mock_coder_test = MagicMock()
             mock_coder_impl = MagicMock()
-            MockCoderCreate.side_effect = [mock_coder_test, mock_coder_impl]
+            mock_reviewer = MagicMock()
+            mock_reviewer.partial_response_content = ""  # No critique
+            MockCoderCreate.side_effect = [mock_coder_test, mock_coder_impl, mock_reviewer]
 
             # Mock for run_cmd: fail first, then succeed
             mock_run_cmd.side_effect = [(1, "tests failed"), (0, "tests passed")]
@@ -252,7 +254,7 @@ class TestPM(unittest.TestCase):
             pm.execute_plan()
 
             # Verify Coder creation
-            self.assertEqual(MockCoderCreate.call_count, 2)
+            self.assertEqual(MockCoderCreate.call_count, 3)
 
             # Verify test coder was run
             mock_coder_test.run.assert_called_once_with(
@@ -267,6 +269,11 @@ class TestPM(unittest.TestCase):
             mock_coder_impl.run.assert_called_once_with(
                 with_message="Implement the feature for: Refactor hello function to make the test"
                 " pass."
+            )
+
+            # Verify reviewer was run
+            mock_reviewer.run.assert_called_once_with(
+                with_message="Critique the implementation for: Refactor hello function"
             )
 
             # Verify task status and state saving
