@@ -1,8 +1,7 @@
 import json
 from pathlib import Path
 
-from aider.coders import Coder
-from aider.plus.state import WorkflowState
+from aider.plus.state import TaskStatus, WorkflowState
 
 
 class AiderPlusPM:
@@ -65,6 +64,19 @@ class AiderPlusPM:
     def execute_plan(self):
         """
         Executes the plan stored in the WorkflowState.
-        This is a placeholder and will be implemented in a future step.
         """
-        pass
+        from aider.coders import Coder
+
+        for task in self.state.tasks:
+            if task.status == TaskStatus.PENDING:
+                self.create_checkpoint(task)
+
+                coder = Coder.create(
+                    main_model=self.main_model,
+                    io=self.io,
+                    repo=self.repo,
+                )
+                coder.run(with_message=task.name)
+
+                task.status = TaskStatus.COMPLETED
+                self.save_state()

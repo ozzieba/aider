@@ -112,7 +112,7 @@ class TestPM(unittest.TestCase):
         res = pm.revert_to_checkpoint(task)
         self.assertFalse(res)
 
-    @patch("aider.plus.pm.Coder")
+    @patch("aider.coders.Coder")
     def test_execute_plan(self, MockCoder):
         with GitTemporaryDirectory() as repo_dir:
             repo_dir = Path(repo_dir)
@@ -125,7 +125,7 @@ class TestPM(unittest.TestCase):
             task = Task(name="Refactor hello function")
             pm.state.tasks = [task]
 
-            mock_coder_instance = MockCoder.return_value
+            mock_coder_instance = MockCoder.create.return_value
             mock_coder_instance.run.return_value = None
 
             pm.create_checkpoint = MagicMock(return_value=True)
@@ -134,6 +134,6 @@ class TestPM(unittest.TestCase):
             pm.execute_plan()
 
             pm.create_checkpoint.assert_called_once_with(task)
-            mock_coder_instance.run.assert_called_once()
+            mock_coder_instance.run.assert_called_once_with(with_message="Refactor hello function")
             self.assertEqual(task.status, TaskStatus.COMPLETED)
             pm.save_state.assert_called()
