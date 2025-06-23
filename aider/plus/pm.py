@@ -42,6 +42,13 @@ class AiderPlusPM:
             # If file is corrupted, malformed, or empty, start fresh
             return WorkflowState()
 
+    def make_plan(self, goal):
+        """
+        Uses an LLM to break down the user's goal into a multi-step plan.
+        This is a placeholder and will be implemented in a future step.
+        """
+        pass
+
     def create_checkpoint(self, task):
         """Creates a git stash checkpoint for the given task."""
         if not self.repo:
