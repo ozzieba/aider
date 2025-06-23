@@ -602,6 +602,48 @@ This category captures the conversational nature of the interactions. The user p
 
 > +Sidekiq is also defined in rails server pods
 
+> let's move the scope and docref initialization to the top
+
+> Ah some of the files didn't get written, please write the tests again
+
+> Hmm, can we skip this devise stuff for these tests?
+
+> let's use a more obscure/unlikely-to-be-actually-used character than | (but still one byte); also we need to escape it if it does appear
+
+> need to escape rs _before_ replacing `quote_char` with rs
+
+> no, remember there can be multiple zips (different versions) for the same batch_id, and we want them all in
+
+> I mean speicifically where you do @table.delete
+
+> let's make `GenerateRecordArtifacts` a bit more concise, in particular the actual logic of the core pipeline. eg move the particular config args to helper methods
+
+> wait, why is this in .call, shouldn't it be .transform?
+
+> For `GenerateRecordArtifacts`, we're defining .call directly... should we be able to do that by defining a Pipeline from the individual transformations/subpipelines?
+
+> I think what I'm looking for is dynamically defining the `GeneratePageThumbnails` _class_ using pipeline algebra... does that make sense?
+
+> can't we use Conditional to avoid manually creating the OrPassthrough helper classes?
+
+> I think we should rename from_files to `from_attachments`, and allow more general specification of which AR models/attachments to use... but also that's not really a stateless transformation, let's properly separate the separate and stateless parts; stateful part can be a service but not a transformation
+
+> `+actually, please prefix the env vars with RECOMPUTATION_`
+
+> `+let's make \`BatchedCreateEmbeddingsJob\` slightly more concise by making the all-chunks-in-elastic checks for positions and embeddings one-liners, and DRYing the fields list`
+
+> `+ok, but we should group by and partition by  production_version, not just batch_id (everywhere)`
+
+> `+actually, it shouldn't be production_version, it should be concat_agg(production_version) over bates_begin,bates_end`
+
+> `+ok, so \`versions\` should be in the group by/partition, and we should start a new row in the final report every time \`versions\` changes`
+
+> `+no, do thtable creation inside the duckdb query`
+
+> `+actually we always need \`EmbeddingsCallback\` with \`close_table\`, but then that should call whatever other callback (in particular to update the review batch progress, but also to can \`run_diagnostics\` for ingested batches`
+
+> `+let's pass the progress updater object with steps and completions as json`
+
 ### 6. Direct & Specific Instructions
 
 These are small, tactical commands for precise changes. They leave little room for ambiguity.
