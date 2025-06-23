@@ -152,12 +152,12 @@ class TestPM(unittest.TestCase):
             # Mock for run_cmd: fail first, then succeed
             mock_run_cmd.side_effect = [(1, "tests failed"), (0, "tests passed")]
 
-            # Mock for IO object with test_cmd
-            mock_io = MagicMock()
-            mock_io.test_cmd = "pytest"
-
             pm = AiderPlusPM(
-                repo=MagicMock(), root=repo_dir, main_model=MagicMock(), io=mock_io
+                repo=MagicMock(),
+                root=repo_dir,
+                main_model=MagicMock(),
+                io=MagicMock(),
+                test_cmd="pytest",
             )
             task = Task(name="Refactor hello function")
             pm.state.tasks = [task]

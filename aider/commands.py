@@ -1548,7 +1548,12 @@ class Commands:
             return
 
         goal = args.strip()
-        pm = AiderPlusPM(repo=self.coder.repo, main_model=self.coder.main_model, io=self.io)
+        pm = AiderPlusPM(
+            repo=self.coder.repo,
+            main_model=self.coder.main_model,
+            io=self.io,
+            test_cmd=self.coder.test_cmd,
+        )
         plan = pm.make_plan(goal)
 
         if not plan or not plan.tasks:

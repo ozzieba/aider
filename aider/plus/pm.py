@@ -6,10 +6,11 @@ from aider.run_cmd import run_cmd
 
 
 class AiderPlusPM:
-    def __init__(self, repo=None, root=".", main_model=None, io=None):
+    def __init__(self, repo=None, root=".", main_model=None, io=None, test_cmd=None):
         self.repo = repo
         self.main_model = main_model
         self.io = io
+        self.test_cmd = test_cmd
         if self.repo:
             self.root = Path(self.repo.root)
         else:
@@ -72,12 +73,59 @@ class AiderPlusPM:
             if task.status == TaskStatus.PENDING:
                 self.create_checkpoint(task)
 
-                coder = Coder.create(
-                    main_model=self.main_model,
-                    io=self.io,
-                    repo=self.repo,
-                )
-                coder.run(with_message=task.name)
+                if self.test_cmd:
+                    # TDD Cycle
+                    # 1. Write a failing test
+                    test_coder = Coder.create(
+                        main_model=self.main_model,
+                        io=self.io,
+                        repo=self.repo,
+                    )
+                    test_coder.run(with_message=f"Write a failing test for: {task.name}")
+
+                    # 2. Run the test, expect failure
+                    exit_code, _ = run_cmd(self.test_cmd)
+                    if exit_code == 0:
+                        if self.io:
+                            self.io.tool_warning(
+                                f"Tests passed for `{task.name}` before implementation. Skipping"
+                                " implementation."
+                            )
+                        task.status = TaskStatus.COMPLETED
+                        self.save_state()
+                        continue
+
+                    # 3. Implement the feature
+                    impl_coder = Coder.create(
+                        main_model=self.main_model,
+                        io=self.io,
+                        repo=self.repo,
+                    )
+                    impl_coder.run(
+                        with_message=(
+                            f"Implement the feature for: {task.name} to make the test"
+                            " pass."
+                        )
+                    )
+
+                    # 4. Run the test, expect success
+                    exit_code, _ = run_cmd(self.test_cmd)
+                    if exit_code != 0:
+                        if self.io:
+                            self.io.tool_error(
+                                f"Tests failed for `{task.name}` after implementation."
+                            )
+                        task.status = TaskStatus.FAILED
+                        self.save_state()
+                        continue
+                else:
+                    # Standard execution without TDD
+                    coder = Coder.create(
+                        main_model=self.main_model,
+                        io=self.io,
+                        repo=self.repo,
+                    )
+                    coder.run(with_message=task.name)
 
                 task.status = TaskStatus.COMPLETED
                 self.save_state()
