@@ -94,6 +94,126 @@ These prompts are used to kick off a new project or a significant new feature. T
 
 > please continue collecting, categorizing, and annotating all the distinct prompts used in the .aider.input.history file(s) into `prompt_patterns.md`. Try to actually include every substantially distinct prompt in full (except eg content of logs/stack traces etc), don't discard much
 
+> this is some half-finished archive filesystem, is it working? How do I test it?
+
+> can we get actual attributes on the files?
+
+> let's test a password-protected zip
+
+> actually, let's just switch from simple `zip` to 7-zip, and handle all formats that 7zip handles
+
+> let's handle nested archives
+
+> great, now let's add actual attributes to the nested files; also let's make sure that we can nest recursively arbitrarily deep
+
+> Ok, so folders under nested archives don't work, let's fix that; also attributes of files under nested archives; also generally we should be able to nest archives recursively
+
+> great, now let's write actual tests for all these behaviors that can be run with bundle exec rake test
+
+> sorry, I don't mean rake test, I mean cargo test
+
+> let's add support for PSTs
+
+> Our check if the mountpoint is accessible / "actually  a FUSE mount" is incorrect, so we have a race condition and without that sleep we're failing tests; let's fix it
+
+> Let's add support for PSTs and MSGs (in particular, with MSG attachments)
+
+> use outlook_pst
+
+> Let's add a GH workflow that builds a docker image with syllo-archivefs installed to say /usr/local/bin, so we can merge it in sidekiq-nuix-docker-build with the other images
+
+> hmm, now it seems to work, but not efficiently; in particular, when listing the contents of an archive it should not download its entire contents
+
+> so in large zip files, we currently do a full "list" operation; but really we only need the first level of files; eg, avfs uses this trick to efficiently read files in a zip, even without/before any caching... let's make sure that we only read first-level entries, not every file in the zip
+
+> let's create a comprehensive property-based testing suite for all functionality; however, for better readability etc let's use Ruby for the testing
+
+> let's do both. For interop, use magnus/rb-sys
+
+> let's manage the fuse mount itself from Ruby; in particular, we need to hard-kill it (I think there's a bug unmounting and gracefully shutting down); also, let's make cargo test run the Ruby tests also
+
+> let's add property-based tests with nontrivial randomly-generated archives with various formats etc
+
+> in the Ruby property-based testing module, let's add a test with nested archives up to 5 deep (mix zip and tar.gz)
+
+> hmm, we used to be able to read metadata from a zip that was itself on gcsfuse, without downloading the whole zip, for ls /mnt/archivefs/mnt/gcs/path/to/zip#; now it's downloading the whole zip; why?
+
+> let's use the 7zip library for zips also
+
+> let's use optimized methods to list the file names. In particular the use case is large zips hosted on GCS, which should be read quickly. It should be doable to list the top-level files and directories in <1 sec on a 6GB zip with just one top-level dir but thousands of total files over a 10MB/s connection (avfs can do it...)
+
+> I think the password is not being properly read by fuse... What if we provide it as part of the file path (be sure to allow proper escaping, especially of slashes)?
+
+> let's say between two hashes; assume the password belongs to the whole archive. Escape using #; double ## means # in the password
+
+> you're still not handling the case of passwords, where the path str looks like /protected_archive.zip#secretpw#, and you need to strip out the `#secretpw#` (note the password itself can also have escaped hashes and slashes...); you need to actually parse the path into its components, including password, and then discard the password
+
+> let's refactor this file. optimize for readability, correcness-by-design, DRY, and general conciseness. Please give 7 different suggestions for how to reorganize the code, then decide on a overall architecture. Write the new architecture in a new markdown document
+
+> let's create a new coding conventions markdown file for the refactor; prefer concise, readable code; prefer functional and declarative code (or functional core/imperative shell as appropriate); use OOP as described in the architecture doc; put unit tests in Rust, and functional/property-based tests in Ruby. Suggest additional coding convention guidelines as appropriate
+
+> Please write a new document with a detailed, step-by-step plan for the refactor, with each step as small as possible while making progress and keeping the code working
+
+> can we split this up in such a way that we have more frequent checkpoints where all the tests pass?
+
+> for readdir, let's do the metadata requests in parallel
+
+> let's make the ruby property testing more comprehensive, with paths that go a few deep into files that have passwords, escaped characters in passwords, etc
+
+> wait let's change the spec so that non-terminated passwrods are not accepted, and within passwords, special characters are escaped with backslashes not hashes. This likely means we should chantge the tests also
+
+> now we want it to actually work with files that have # in the name. Perhaps we should require that they be escaped when accessing via fuse
+
+> cool, now let's implement a Ruby wrapper for Python objects, like PyCall.rb does; but obviously using pyo3/magnus primitives
+
+> let's add tests for use of the Python object wrapper from Ruby
+
+> let's add tests for all relevant Python/ruby types showing they can be passed back and forth
+
+> let's test/implement classes
+
+> let's test/implement module import functionality
+
+> let's make sure it works with Ruby and Python threading
+
+> let's test pandas, numpy, lancedb
+
+> please fix lance, and also do all the lance/numpy/pandas stuff concurrently
+
+> let's add tests with networking
+
+> let's add a README
+
+> let's add explicit support/tests for Python Async
+
+> should we override .to_i on Python objects to first call python int()?
+
+> wait can we call to_int_py automatically as part of to_i on Python objects?
+
+> let's add a .to_a method on Python lists in Ruby, and .to_h on dicts
+
+> ok, now let's add support for iteration, ie mypylist.each and mypydict.each; should use __iter__ underneath and work with all python iterables
+
+> great, now let's make sure that `map` works also, as well as Parallel.map/Parallel.each
+
+> do we have a test for Python code calling back into Ruby (eg, calling a Ruby method provided as a callback)? If not, let's.
+
+> for each/map, we're currently materializing an entire iterator... let's add a failing test to document that behavior (and then change to lazy evaluation)
+
+> let's try without the I/O (stdout/stderr) redirection, I think we don't need it
+
+> let's let's fully propagate arbitrary Python error classes, so they can be caught as normal in Ruby, perhaps with something like rescue Pyrbrs_module.CustomError => whatever; or if you have an even more ergonomic syntax
+
+> can we also make Ruby get the full Python traceback as if it were native ruby?
+
+> for the case of common Python errors that have a direct Ruby equivalent, let's special-case and make the generated error inherit from the standard Ruby equivalent so that it can be caught with either name
+
+> let's continue the refactor to proper typed error passing from Python to Ruby, ultimately fixing the tests also
+
+> let's clean up old/unnecessary comments, particularly ones that document a change rather than the current status of the code
+
+> please proceed with the refactor. at each step, mark your progress in the doc and let me know what commands to run for validation remember to prepend PYO3_PYTHON=/usr/bin/python3 when relevant, and if you run cargo use --manifest-path ext/pyrbrs/Cargo.toml. Let me know when you're done
+
 ### 2. Implementation & Refactoring
 
 These prompts are for making specific, significant changes to the codebase. They are more concrete than goal-setting prompts but still grant the AI autonomy to figure out the implementation details across multiple files.
@@ -315,6 +435,38 @@ These are reactive prompts used when an error occurs. The user provides context 
 > `/ask but it seems that chr(254) in both Python and duckdb returns multiple bytes... can we get just the 0xbe byte and use that as quote char?`
 
 > `/ask still same error, and sameresult in Python # python -c 'print("\xBE")'|xxd`
+
+> looks like it's looking for the archive in the wrong place, needs to have ./
+
+> Woops it didn't find the nested tar.gz archive
+
+> hmm, can't seem to process nested archives [..log..]
+
+> hmm now no error but find is still not listing the contents of the nested tar.gz
+
+> ah looks like the nested archive isn't showing up as a directory
+
+> still having trouble with nested archives
+
+> hmm, not seeing the nested files
+
+> umm now you broke nested file handling entirely...
+
+> hmm, should see file2.txt in folder1.tar.gz
+
+> hmm, should see file2.txt in folder1.tar.gz, but at least now we actually have an error!
+
+> hmm, let's log the tree in the temp directory to make sure we're looking in the right place
+
+> ah can we actually see the tree in test output?
+
+> ok so we're not actually extracting the inner file...
+
+> still no luck
+
+> let's give it an actual few seconds
+
+> hmm that finished ~instantly... but also it can't be mount readiness because all the other tests pass
 
 > duckdb.duckdb.BinderException: Binder Error: Referenced column "bates_begin" not found in FROM clause!
 
@@ -574,6 +726,96 @@ These prompts leverage the AI for code comprehension and analysis without reques
 
 > /ask what do we need to do to get rspec to exit with 0 if there are pending tests but no failing tests?
 
+> what archives do we support?
+
+> hmm why can't it find the directory inside the bz2
+
+> why does it seem to work in the amnual test but not in the cargo test?
+
+> hmm, why are we trying to list the archive from the filesystem instead of using the archive tool?
+
+> wait the test uses ArchiveFUSE directly so it bypasses the filesystem lookup logic
+
+> hmm, avfs does it almost instantly even on the first read, how can we do that?
+
+> hmm, we're still iterating through all entries, which is very expensive, especially eg when the zip itself is on a remote gcs... avfs is somehow able to handle this
+
+> the part that's costly is I/O. Remember, the zip itself is on a remote object store (GCS exposed using gcsfuse). avfs is definitely not reading those entries until it needs them
+
+> are we failing to cache implied directories in metadata?
+
+> ZipArchive should be able to do it quickly, think carefully what APIs to use. eg maybe root_dir / central_directory_start; or possibly ZipStreamReader. Or does root_dir_common_filter help us?
+
+> Here are five plausible root-cause hypotheses for why the password-protected file is still reported with size 0 and empty content...
+
+> should ResolvedPath include the password?
+
+> still, PasswordManager feels rather stateful for what is generally a rather stateless system (modulo caching, but since this is all immutable that doesn't really add complexity)
+
+> so at this point is there any reason to keep PasswordManager, and to not merge the password into ResolvedPath? Merging should make the recursive parsing logic a bit more consistent, since each path segment may or may not have a password
+
+> let's edit the md file to reflect this
+
+> let's edit the md to put the gvl methods together with other ruby methods, not python
+
+> actually, let's have separate files for pure-ruby , pure-python, and ruby-python interactions, eg gvl/gil handoff
+
+> does the proposed structure in rust_module_structure.md make sense to you?
+
+> does it make more sense perhaps to merge the `ruby_python_interop` code into the Ruby code or something?
+
+> let's rename `pure_python` to python_rust_interop, and same for ruby
+
+> /ask I believe it is on the actual python list
+
+> /ask the entire relevant codebase is the python_path.rb that you see, and that's errorring out with "Can't modify frozen Array"; so we need to fix something
+
+> /ask are we automatically converting lists to arrays?
+
+> /ask so now what do I have to do to import this in another repo?
+
+> /ask ok, how about GitHub Packages?
+
+> /ask why are we using unsafe?
+
+> /ask for bignum conversion, can't we use an actual bignum library in Rust, rather than using strings?
+
+> /ask wait the selection happens at buildime?
+
+> /ask can we make it happen at runtime?
+
+> /ask but does that apply to python packages?
+
+> /ask can we just set sys.path?
+
+> /ask what other tests would be useful here?
+
+> /ask so everything compiles cleanly, all tests are passing... What suggestions do you have to improve this code?
+
+> /ask which of these are we trying to use? let me know and I'll give you the docs
+
+> /ask see the docs, `method` is not in Value or Object
+
+> /ask Do you you mean rb_call_funcall_kw?
+
+> /ask Do you you mean rb_check_funcall_kw?
+
+> /ask ah do we need to set contains_kw_args to true here?
+
+> /ask hmm, can we make sure that when dicts/hashes are passed back and forth between Python and Ruby, they preserve order? Why don't we start with a failing test that shows that's not currently the case
+
+> /ask does this work / are we testing in both directions
+
+> /ask how would you improve this code base? give 10 suugestions, including structrual, tactical, and everything in between
+
+> /ask hmm, a Mac user is not able to access their venv packages when using pyrbrs... how do I help them?
+
+> /ask how can I check directly whther it's there?
+
+> /ask why quick/Marshal ?
+
+> /ask how does it know to use that dir, can we just ask for all versions of pyrbrs?
+
 ### 5. Iterative Refinement & Clarification
 
 This category captures the conversational nature of the interactions. The user provides course corrections, adds details, or refines a previous request.
@@ -720,6 +962,8 @@ This category captures the conversational nature of the interactions. The user p
 
 > `+let's pass the progress updater object with steps and completions as json`
 
+> ok, please address the root cause then
+
 > that callback is only for review batches, `CreateLanceDbIndex` is alswo called in other contexts... let's have it take a class as a parameter
 
 > I think we need to update create_images.rb as well; and it might make sense to leave  Documentable#text_from_tokens as a thin wrapper on the relevant pipeline?
@@ -741,6 +985,28 @@ This category captures the conversational nature of the interactions. The user p
 > I have the following critique of `docs/produce_batch_refactoring_plan.md` ... Please address in the following ways...
 
 > /ask I _COMMAND_ you to give me an implementation with dynamic class generation and no |res,meta| boilerplate
+
+> wait,reverting your change, that will make everything slower... we should only get metadata when we're about to return a file; we do that in general, should also be for password-protected files
+
+> hmm, still not caching metadata properly
+
+> no, it's using gcsfuse, not direct https requests; avfs can do it, we should be able to also
+
+> let's try making the changes in smaller blocks of code; ok if it doesn't work in between
+
+> um no, if the test is wrong let's fix the test (I reverted your change)
+
+> let's simplify the logic a bit here, always escape with backslashes, use hashes just for beginning and termination
+
+> hmm, that seems to be trying to read the entire 6GB zip just to list the central directory
+
+> still hanging.... let's use archive.file_names; that should be enough to get a directory hierarchy; then we can retrieve metadata for just the top-level items we'll return from readdir
+
+> hmm, that ended up being slower than before, how much parallelism are we allowing?
+
+> let's add a delay before each job in the workflow to avoid contention in the cache; let's make the delay depend on which job number it is
+
+> but does it work if we do PyClass.new rather than PyClass.call?
 
 > do we need to do that anywhere else?
 
@@ -892,6 +1158,18 @@ These prompts ask the AI to generate artifacts that are not production code, suc
 
 > let's document the models as described in the transformations.md doc, with each model in its own md file, showing its structure, its relation to the concerns, all its relevant method signatures for the various arrows, and usage examples
 
+> Please write a standalone script that uses the zip crate to get all the entries from gcs/tla-syllo-oz-bucket/cache/oz/record_datum_batches/4/e7e3457518765868c08f16cf11f2507d-blah.zip, and list the top-level directories and files
+
+> So I don't really know Rust (though I do know Ruby and Python), but I need to review this code. Please generate a pedagogic explanation of the code, how it's structured, what each part does, etc. Let's do it in Markdown form, akin to a wiki, in a docs directory. Don't do this in one step, one Markdown file or section at a time. Ultimately the Markdown should contain every line of code from the project and explain it. For each block of code, have a natural-language explanation of what it does, how it fits in with the rest of the code etc; and where appropriate a block of Ruby or Python code to which it's equivalent (or almost equivalent. Explain specific Rust syntax, stdlib methods etc. start with an introduction file. Let me know when you are done
+
+> please create a README.md with an overview of what this does, features, and detailed usage instructions, including passwords, escaping, nested archives, etc
+
+> please describe the test suite, how to develop, etc in the readme
+
+> let's also update the README to note that errors can be custom
+
+> please update the detailed docs to reflect the current state of the code. do it in small blocks. You can put many in each response. Let me know when you're done
+
 ### 8. Tooling & Environment Setup
 
 This category includes prompts related to setting up the development, testing, and deployment environment. This includes Continuous Integration (CI) configuration, test harnesses, and managing dependencies.
@@ -965,6 +1243,34 @@ This category includes prompts related to setting up the development, testing, a
 > we're trying to cherry-pick minimal changes from api-transformations_productions to the current branch (generate_thunbnails_transformation) to the current branch, though generally only addressing files where current branch is different from main, looks like we need to pull in Pipeline also, please provide commands for that. Also check if there's anything else we're likely to need
 
 > please give me a command to find all files that were updated from origin/main to origin/generate_thumbnails_transform (also checked out as worktree in ../api-transformations) and for all of those files find the diff between generate_thumbnails_transform and HEAD/transformations_productions
+
+> let's use our custom gemstash server in addition to GH Packages; in particular, please have Github actions retrieve the secret from Secrets manager, figure out the URL for the gem repo (it's in us-east4), and push to it. Unlike on GitHub, we should be able to push multiple instances with the same package name and version but different platform strings
+
+> the linux arm64 build fails bc GH doesn't have those runners. Let's use our own runners on GCP instead
+
+> let's set his up to automatically install rust toolchain if it doesn't exist
+
+> ok great. Now, let's make sure that we build for linux-amd64, and OSX arm64 and amd64; and store the resulting package somewhere private that but that we can use it from a regular Gemfile in another repo in the same GH org; either GH artifact or GCP Artifact Registry (we have Workload Identity Federation set up), whatever is easier
+
+> good point re libpython hardcoded location, let's remove that
+
+> no, the problem is we can't push the same version with different platform strings... Need to name it differently as before
+
+> wait, but we probably do want to set spec.platform
+
+> why do we have both "Publish to GH Actions" and "Upload"?
+
+> let's remove the Upload step
+
+> it's not letting me sign into Google, please do whatever we do in docker-build.yml
+
+> hmm, let's just comment out the github pushes for now, and just push to to new one
+
+> right, the q is why does gh say the version already exists, but then actually pulling it fails??
+
+> hardcode whatever you need from the gemstash .sh scripts that were used to create the Cloud Run
+
+> no, should compile on GHA not dev machine
 
 ## General Observations & Best Practices
 
