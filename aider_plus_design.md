@@ -726,7 +726,7 @@ This section provides a granular, step-by-step implementation plan for building 
 *   **Action:** In `aider/commands.py`, add a `cmd_plan(self, args)` method. This command will instantiate `AiderPlusPM`, which will then use an LLM to break down the user's goal (from `args`) into a multi-step plan. This plan will be stored in a `WorkflowState` object. The plan should be presented to the user for approval via `io.confirm_ask`.
 *   **Tests:** In `tests/basic/test_commands.py`, add a test for `cmd_plan`. Mock `AiderPlusPM` and the LLM call. Verify that the command correctly parses the user's goal, passes it to the PM, and that the mocked plan is displayed to the user for confirmation.
 
-**Step 5: Implement sequential task execution. (IN PROGRESS)**
+**Step 5: Implement sequential task execution. (DONE)**
 *   **Action:** In `AiderPlusPM`, implement an `execute_plan()` method. This method should loop through the tasks in `WorkflowState` in order. For each task, it will:
     1.  Create a git checkpoint using the method from Step 3.
     2.  Formulate a prompt for an 'executor' agent.
@@ -735,7 +735,7 @@ This section provides a granular, step-by-step implementation plan for building 
     5.  Update the task's status to 'completed' and save the `WorkflowState`.
 *   **Tests:** In `tests/plus/test_pm.py`, create a new test for `execute_plan`. Mock the LLM call to return a specific code change in edit block format. Provide a simple `WorkflowState` with one task. Verify that the target file is modified correctly and that the task's status is updated to 'completed' in `workflow.json`.
 
-**Step 6: Integrate a TDD cycle and self-critique loop.**
+**Step 6: Integrate a TDD cycle and self-critique loop. (IN PROGRESS)**
 *   **Action:** Refactor `execute_plan()` to incorporate a TDD and self-critique workflow. When a task is for implementation, the PM should dynamically inject new sub-tasks into the plan:
     1.  **"Write a failing test for [feature]"**: Execute this task first. After it's done, run the specified `test_cmd`. The test should fail.
     2.  **"Implement [feature]"**: Execute this task. After, run `test_cmd` again. The test should now pass.

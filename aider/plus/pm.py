@@ -2,6 +2,7 @@ import json
 from pathlib import Path
 
 from aider.plus.state import TaskStatus, WorkflowState
+from aider.run_cmd import run_cmd
 
 
 class AiderPlusPM:

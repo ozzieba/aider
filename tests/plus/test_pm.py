@@ -137,3 +137,54 @@ class TestPM(unittest.TestCase):
             mock_coder_instance.run.assert_called_once_with(with_message="Refactor hello function")
             self.assertEqual(task.status, TaskStatus.COMPLETED)
             pm.save_state.assert_called()
+
+    @patch("aider.coders.Coder.create")
+    @patch("aider.plus.pm.run_cmd")
+    def test_execute_plan_with_tdd(self, mock_run_cmd, MockCoderCreate):
+        with GitTemporaryDirectory() as repo_dir:
+            repo_dir = Path(repo_dir)
+
+            # Mocks for Coder instances
+            mock_coder_test = MagicMock()
+            mock_coder_impl = MagicMock()
+            MockCoderCreate.side_effect = [mock_coder_test, mock_coder_impl]
+
+            # Mock for run_cmd: fail first, then succeed
+            mock_run_cmd.side_effect = [(1, "tests failed"), (0, "tests passed")]
+
+            # Mock for IO object with test_cmd
+            mock_io = MagicMock()
+            mock_io.test_cmd = "pytest"
+
+            pm = AiderPlusPM(
+                repo=MagicMock(), root=repo_dir, main_model=MagicMock(), io=mock_io
+            )
+            task = Task(name="Refactor hello function")
+            pm.state.tasks = [task]
+
+            pm.create_checkpoint = MagicMock(return_value=True)
+            pm.save_state = MagicMock()
+
+            pm.execute_plan()
+
+            # Verify Coder creation
+            self.assertEqual(MockCoderCreate.call_count, 2)
+
+            # Verify test coder was run
+            mock_coder_test.run.assert_called_once_with(
+                with_message="Write a failing test for: Refactor hello function"
+            )
+
+            # Verify run_cmd was called twice
+            self.assertEqual(mock_run_cmd.call_count, 2)
+            mock_run_cmd.assert_any_call("pytest")
+
+            # Verify implementation coder was run
+            mock_coder_impl.run.assert_called_once_with(
+                with_message="Implement the feature for: Refactor hello function to make the test"
+                " pass."
+            )
+
+            # Verify task status and state saving
+            self.assertEqual(task.status, TaskStatus.COMPLETED)
+            pm.save_state.assert_called()
