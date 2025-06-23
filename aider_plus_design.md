@@ -379,34 +379,6 @@ The Aider+ PM can employ strategies that use the creative strengths of LLMs to g
 *   **Hypothesis-Driven Debugging:** When a test fails, a `debugging` agent first generates multiple hypotheses for the root cause. It then devises and runs a minimal experiment (e.g., a new targeted test) to validate each hypothesis before attempting a fix.
 *   **Test Case Generation from High-Level Requirements:** Before implementation, a `requirements_analyst` agent generates a suite of acceptance criteria (e.g., in Gherkin format) from the user's goal. This becomes a mandatory checklist for the `tester` agent.
 
-#### 7.1.1. AI-Powered Advanced Testing & Verification
-
-The "Quality Gate" can be extended with sophisticated verification techniques that were traditionally expensive to implement.
-
-*   **Probabilistic Verification (Dual Implementation):** A high-confidence technique where the PM assigns the same functional specification to two *independent* `coder` agents (ideally backed by different LLMs). A third agent then writes a test suite that fuzzes both implementations with the same inputs and asserts that their outputs are identical. If confidence is low, it escalates.
-    ```python
-    results = await parallel_execute([
-        agent_pool.get("claude").implement(task),
-        agent_pool.get("gpt4o").implement(task)
-    ])
-    confidence = analyze_consensus(results)
-    if confidence < 0.8:
-        escalate_to_human("Low confidence in implementation consensus.")
-    ```
-*   **Property-Based Testing:** The PM instructs a `tester` agent to define general properties the code must satisfy (e.g., "output is always between 0 and original price"). A library like Hypothesis then generates hundreds of inputs to try and falsify these properties.
-*   **AI-Guided Fuzz Testing:** The PM deploys an agent to generate random and malformed inputs to an API endpoint or function to uncover security vulnerabilities and crashes.
-*   **Invariant & Assertion Generation:** A `reviewer` agent analyzes code and automatically injects assertions to verify critical assumptions at runtime, especially during testing.
-*   **Simplified Formal Methods:** For critical logic like a state machine, an `analyst` agent can translate it into a simplified formal specification (e.g., TLA+) and use a model checker to test for deadlocks or race conditions.
-
-#### 7.1.2. Meta-Verification: Using LLMs to Counteract LLM Weaknesses
-
-The Aider+ PM can employ strategies that use the creative strengths of LLMs to guard against their weaknesses, such as hallucination or subtle logical errors.
-
-*   **Adversarial "Red Team" Testing:** After a feature is complete, a separate `red_team` agent is assigned the single goal: "break this code." This agent thinks adversarially to find security flaws and edge cases the original `tester` might have missed.
-*   **Explanation-Based Verification:** An `auditor` agent reads the final code and is tasked to "explain this code's purpose and logic in plain English." This explanation is compared against the original design specification to find deviations.
-*   **Hypothesis-Driven Debugging:** When a test fails, a `debugging` agent first generates multiple hypotheses for the root cause. It then devises and runs a minimal experiment (e.g., a new targeted test) to validate each hypothesis before attempting a fix.
-*   **Test Case Generation from High-Level Requirements:** Before implementation, a `requirements_analyst` agent generates a suite of acceptance criteria (e.g., in Gherkin format) from the user's goal. This becomes a mandatory checklist for the `tester` agent.
-
 ### 7.2. Throughput Optimization: Maximizing Parallelism and Efficiency
 
 To maximize the speed of delivery, the PM will employ several strategies to optimize workflow throughput.
