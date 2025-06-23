@@ -209,13 +209,12 @@ class AiderPlusPM:
                                 self.io.tool_error(f"Execution aborted during task {task.name}.")
                             task.status = TaskStatus.FAILED
 
-                            for f in futures:
+                            # Cancel other futures and set their tasks to PENDING
+                            for f, t in futures.items():
                                 if f != future:
                                     f.cancel()
-
-                            for t in self.state.tasks:
-                                if t.id != task.id and t.status == TaskStatus.IN_PROGRESS:
-                                    t.status = TaskStatus.PENDING
+                                    if t.status == TaskStatus.IN_PROGRESS:
+                                        t.status = TaskStatus.PENDING
 
                             self.save_state()
                             return

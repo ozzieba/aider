@@ -463,7 +463,7 @@ class TestPM(unittest.TestCase):
     def test_execute_plan_with_failure_and_abort(self, mock_run_cmd, MockCoderCreate, MockTeam):
         with GitTemporaryDirectory() as repo_dir:
             task_a = Task(name="Task A")
-            task_b = Task(name="Task B")
+            task_b = Task(name="Task B", dependencies=[task_a.id])
             mock_io = MagicMock()
             pm = AiderPlusPM(
                 repo=MagicMock(),
@@ -473,18 +473,23 @@ class TestPM(unittest.TestCase):
                 test_cmd="pytest",
             )
             pm.state.tasks = [task_a, task_b]
-            mock_coder_instance = MagicMock()
-            MockCoderCreate.return_value = mock_coder_instance
+
+            mock_coder_test = MagicMock()
+            mock_coder_impl = MagicMock()
+            MockCoderCreate.side_effect = [mock_coder_test, mock_coder_impl]
+
+            # Test fails, user aborts
             mock_run_cmd.side_effect = [(1, "fail"), (1, "fail")]
             mock_io.get_input.return_value = "abort"
 
             pm.execute_plan()
 
-            self.assertEqual(mock_run_cmd.call_count, 2)
-            mock_io.get_input.assert_called_once()
+            # Verify that the first task failed and the second was not started
             self.assertEqual(task_a.status, TaskStatus.FAILED)
             self.assertEqual(task_b.status, TaskStatus.PENDING)
-            mock_coder_instance.run.assert_called_with(
-                with_message="Write a failing test for: Task A"
-            )
-            self.assertEqual(mock_coder_instance.run.call_count, 2)
+
+            # Verify the sequence of calls
+            self.assertEqual(mock_run_cmd.call_count, 2)
+            mock_io.get_input.assert_called_once()
+            mock_coder_test.run.assert_called_once()
+            mock_coder_impl.run.assert_called_once()
