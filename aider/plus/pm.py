@@ -7,6 +7,10 @@ from aider.plus.team import AIEngineeringTeam
 from aider.run_cmd import run_cmd
 
 
+class _AbortExecution(Exception):
+    pass
+
+
 class AiderPlusPM:
     def __init__(self, repo=None, root=".", main_model=None, io=None, test_cmd=None, team_config=None):
         self.repo = repo

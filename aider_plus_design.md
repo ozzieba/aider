@@ -759,7 +759,7 @@ This section provides a granular, step-by-step implementation plan for building 
 
 **Goal:** Enable true autonomy and parallelism.
 
-**Step 8: Implement parallel task execution. (IN PROGRESS)**
+**Step 8: Implement parallel task execution. (DONE)**
 *   **Action:**
     1.  Modify `AiderPlusPM.execute_plan()` to identify tasks with no pending dependencies.
     2.  Use a thread pool or `asyncio` to execute these tasks in parallel.
@@ -771,6 +771,21 @@ This section provides a granular, step-by-step implementation plan for building 
     3.  Mock the agent execution (e.g., `Coder.run`) to include a `time.sleep()` to simulate work, and use a side effect to track the start and end times of each task.
     4.  Verify that independent tasks (A and B) run concurrently (their execution times overlap).
     5.  Verify that dependent tasks (C) only start after their dependencies (A and B) are complete.
+
+**Step 9: Implement error handling and escalation. (IN PROGRESS)**
+*   **Action:**
+    1.  Modify `AiderPlusPM._execute_task()` to catch exceptions during task execution.
+    2.  When a task fails (e.g., tests don't pass, an exception is caught), instead of just marking it as `FAILED`, use `self.io` to report the failure to the user.
+    3.  The report should include the task name and the error.
+    4.  After reporting, ask the user for guidance with options like "Retry", "Skip", "Abort".
+    5.  Implement logic to handle the user's choice. "Retry" re-runs the task. "Skip" marks it as completed to unblock dependencies. "Abort" stops the plan execution.
+*   **Tests:**
+    1.  In `tests/plus/test_pm.py`, add `test_execute_plan_with_failure_and_retry`.
+    2.  Mock a task that fails on the first attempt (e.g., `run_cmd` returns a non-zero exit code) and succeeds on the second.
+    3.  Mock `io` to simulate the user choosing "Retry".
+    4.  Verify the task is executed twice and ultimately marked as `COMPLETED`.
+    5.  Add `test_execute_plan_with_failure_and_skip`. Mock a failing task, simulate user choosing "Skip", and verify the task is marked `COMPLETED` and dependent tasks are run.
+    6.  Add `test_execute_plan_with_failure_and_abort`. Mock a failing task, simulate user choosing "Abort", and verify `execute_plan` terminates early.
 
 ## Glossary
 

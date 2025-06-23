@@ -376,3 +376,38 @@ class TestPM(unittest.TestCase):
             # Check that C starts after both A and B finish
             self.assertTrue(start_c > end_a)
             self.assertTrue(start_c > end_b)
+
+    @patch("aider.plus.pm.AIEngineeringTeam")
+    @patch("aider.coders.Coder.create")
+    @patch("aider.plus.pm.run_cmd")
+    def test_execute_plan_with_failure_and_retry(self, mock_run_cmd, MockCoderCreate, MockTeam):
+        with GitTemporaryDirectory() as repo_dir:
+            task = Task(name="Task A")
+            mock_io = MagicMock()
+
+            pm = AiderPlusPM(
+                repo=MagicMock(),
+                root=repo_dir,
+                main_model=MagicMock(),
+                io=mock_io,
+                test_cmd="pytest",
+            )
+            pm.state.tasks = [task]
+
+            # Mock Coder to do nothing
+            MockCoderCreate.return_value = MagicMock()
+
+            # Mock run_cmd to fail once, then succeed
+            mock_run_cmd.side_effect = [(1, "tests failed"), (0, "tests passed")]
+
+            # Mock user choosing 'retry'
+            pm.io.get_input.return_value = "retry"
+
+            pm.execute_plan()
+
+            # Verify that run_cmd was called twice (initial fail, then retry success)
+            self.assertEqual(mock_run_cmd.call_count, 2)
+            # Verify user was asked to retry
+            pm.io.get_input.assert_called_once()
+            # Verify task is marked as completed
+            self.assertEqual(task.status, TaskStatus.COMPLETED)
