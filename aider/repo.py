@@ -123,7 +123,11 @@ class GitRepo:
             raise FileNotFoundError
 
         # https://github.com/gitpython-developers/GitPython/issues/427
-        self.repo = git.Repo(repo_paths.pop(), odbt=git.GitDB)
+        # odbt=git.GitDB is a workaround for gitpython bug < 3.1.10
+        try:
+            self.repo = git.Repo(repo_paths.pop())
+        except AssertionError:
+            self.repo = git.Repo(repo_paths.pop(), odbt=git.GitDB)
         self.root = utils.safe_abs_path(self.repo.working_tree_dir)
 
         if aider_ignore_file:
@@ -624,7 +628,7 @@ class GitRepo:
         return commit.message
 
     def _find_stash_for_task(self, task_id):
-        prefix = f"aider-plus-task:{task_id}:"
+        prefix = f"aider-plus-task:{task_id} "
         try:
             # The format gives lines like: stash@{0}:aider-plus-task:task_id:message
             stashes_str = self.repo.git.stash("list", "--format=%gd:%gs")
@@ -643,7 +647,7 @@ class GitRepo:
                 continue
 
             ref, message = parts
-            if message.startswith(prefix):
+            if message.lstrip().startswith(prefix):
                 match = re.match(r"stash@\{(\d+)\}", ref)
                 if match:
                     index = int(match.group(1))
@@ -653,7 +657,7 @@ class GitRepo:
     def create_task_stash(self, task_id, message):
         """Creates a stash with a structured message for a given task."""
         try:
-            stash_message = f"aider-plus-task:{task_id}:{message}"
+            stash_message = f"aider-plus-task:{task_id} {message}"
             self.repo.git.stash("push", "-u", "-m", stash_message)
             return True
         except ANY_GIT_ERROR as err:
