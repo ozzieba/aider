@@ -1555,6 +1555,7 @@ class Commands:
             io=self.io,
             test_cmd=self.coder.test_cmd,
             team_config=getattr(self.args, "team_config", None),
+            sandbox_config=getattr(self.args, "sandbox_config", None),
         )
 
         # Clear out any previous plan

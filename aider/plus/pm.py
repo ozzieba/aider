@@ -3,6 +3,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
 from aider.plus.prompts import PlusPrompts
+from aider.plus.sandbox import Sandbox
 from aider.plus.state import Task, TaskStatus, WorkflowState
 from aider.plus.team import AIEngineeringTeam
 from aider.run_cmd import run_cmd
@@ -13,7 +14,16 @@ class _AbortExecution(Exception):
 
 
 class AiderPlusPM:
-    def __init__(self, repo=None, root=".", main_model=None, io=None, test_cmd=None, team_config=None):
+    def __init__(
+        self,
+        repo=None,
+        root=".",
+        main_model=None,
+        io=None,
+        test_cmd=None,
+        team_config=None,
+        sandbox_config=None,
+    ):
         self.repo = repo
         self.team = AIEngineeringTeam(main_model, team_config=team_config)
         self.io = io
@@ -24,6 +34,7 @@ class AiderPlusPM:
             self.root = Path(root)
         self.workflow_file = self.root / ".aider" / "workflow.json"
         self.state = self.load_state()
+        self.sandbox = Sandbox(sandbox_config, root=self.root, io=self.io)
 
     def save_state(self):
         """
@@ -145,7 +156,7 @@ class AiderPlusPM:
             )
 
             # 2. Run the test, expect failure
-            exit_code, output = run_cmd(self.test_cmd)
+            exit_code, output = self.sandbox.run(self.test_cmd)
             if exit_code == 0:
                 if self.io:
                     self.io.tool_warning(
@@ -168,7 +179,7 @@ class AiderPlusPM:
                 impl_coder.run(with_message=impl_prompt)
 
                 # 4. Run the test, expect success
-                exit_code, output = run_cmd(self.test_cmd)
+                exit_code, output = self.sandbox.run(self.test_cmd)
                 if exit_code == 0:
                     break  # Success
 
@@ -210,7 +221,7 @@ class AiderPlusPM:
                 fixer = Coder.create(main_model=self.team.get_coder(), io=self.io, repo=self.repo)
                 fixer.run(with_message=critique)
 
-                exit_code, _ = run_cmd(self.test_cmd)
+                exit_code, _ = self.sandbox.run(self.test_cmd)
                 if exit_code != 0:
                     if self.io:
                         self.io.tool_error(

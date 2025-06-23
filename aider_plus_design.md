@@ -190,6 +190,11 @@ The PM will manage agent pools and route tasks intelligently based on patterns.
         budget_usd: 5.00 # Per /plan workflow
       agentic_workflow:
         max_retries_per_task: 3
+      sandbox:
+        enabled: true
+        type: docker # or firejail
+        docker_image: "aider-test-env:latest"
+        # The project directory will be mounted at /app in the container
     ```
 
 ## 4. Example End-to-End Flow: A Day in the Life of the Aider+ PM
@@ -531,6 +536,7 @@ Robust autonomy requires equally robust safety rails.
 * **Policy Engine** – Before executing high-risk operations (pushing to protected branches, calling external APIs) the PM consults an OPA/Rego policy file (`.aider/policy.rego`).
 * **Prompt Sanitization Middleware** – Sensitive literals (API keys, customer data) are masked before being sent to any external LLM provider.
 * **Immutable Audit Log** – All commands, agent outputs, and external requests are appended to `.aider/audit.log` for compliance review and post-incident forensics.
+* **Sandboxed Execution Environment** - To mitigate security risks from running AI-generated code and tests, all test commands are executed within an isolated sandbox. This prevents tests from accessing the network, modifying the host filesystem outside the project directory, or executing malicious code. Docker is the recommended sandboxing technology due to its widespread adoption and robust isolation capabilities. This is configurable and can be disabled if not needed.
 
 ## 12. Plugin & Extension API
 
