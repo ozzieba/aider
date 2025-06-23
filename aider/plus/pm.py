@@ -103,8 +103,7 @@ class AiderPlusPM:
                     )
                     impl_coder.run(
                         with_message=(
-                            f"Implement the feature for: {task.name} to make the test"
-                            " pass."
+                            f"Implement the feature for: {task.name} to make the test pass."
                         )
                     )
 
@@ -118,6 +117,37 @@ class AiderPlusPM:
                         task.status = TaskStatus.FAILED
                         self.save_state()
                         continue
+
+                    # 5. Critique and self-correction loop
+                    while True:
+                        reviewer = Coder.create(
+                            main_model=self.main_model, io=self.io, repo=self.repo
+                        )
+                        reviewer.run(
+                            with_message=f"Critique the implementation for: {task.name}"
+                        )
+                        critique = reviewer.partial_response_content.strip()
+
+                        if not critique:
+                            # No feedback, task is complete
+                            break
+
+                        # We have feedback, so we need to fix it.
+                        fixer = Coder.create(
+                            main_model=self.main_model, io=self.io, repo=self.repo
+                        )
+                        fixer.run(with_message=critique)
+
+                        # Re-run tests after fix
+                        exit_code, _ = run_cmd(self.test_cmd)
+                        if exit_code != 0:
+                            if self.io:
+                                self.io.tool_error(
+                                    f"Tests failed for `{task.name}` after applying critique."
+                                )
+                            task.status = TaskStatus.FAILED
+                            self.save_state()
+                            break  # Exit critique loop on test failure after fix
                 else:
                     # Standard execution without TDD
                     coder = Coder.create(
@@ -127,5 +157,6 @@ class AiderPlusPM:
                     )
                     coder.run(with_message=task.name)
 
-                task.status = TaskStatus.COMPLETED
+                if task.status != TaskStatus.FAILED:
+                    task.status = TaskStatus.COMPLETED
                 self.save_state()
