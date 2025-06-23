@@ -2,7 +2,7 @@ import json
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
-from aider.plus.state import TaskStatus, WorkflowState
+from aider.plus.state import Task, TaskStatus, WorkflowState
 from aider.plus.team import AIEngineeringTeam
 from aider.run_cmd import run_cmd
 
@@ -95,21 +95,44 @@ class AiderPlusPM:
                 return TaskStatus.COMPLETED
 
             # 3. Implement the feature
-            impl_coder = Coder.create(
-                main_model=self.team.get_coder(),
-                io=self.io,
-                repo=self.repo,
-            )
-            impl_coder.run(
-                with_message=f"Implement the feature for: {task.name} to make the test pass."
-            )
+            while True:
+                impl_coder = Coder.create(
+                    main_model=self.team.get_coder(),
+                    io=self.io,
+                    repo=self.repo,
+                )
+                impl_coder.run(
+                    with_message=f"Implement the feature for: {task.name} to make the test"
+                    " pass."
+                )
 
-            # 4. Run the test, expect success
-            exit_code, _ = run_cmd(self.test_cmd)
-            if exit_code != 0:
-                if self.io:
-                    self.io.tool_error(f"Tests failed for `{task.name}` after implementation.")
-                return TaskStatus.FAILED
+                # 4. Run the test, expect success
+                exit_code, output = run_cmd(self.test_cmd)
+                if exit_code == 0:
+                    break  # Success
+
+                if not self.io:
+                    return TaskStatus.FAILED
+
+                error_message = f"Tests failed for `{task.name}` after implementation."
+                if output:
+                    error_message += f"\n{output}"
+                self.io.tool_error(error_message)
+
+                response = self.io.get_input(
+                    "Choose an action: [Retry|Skip|Abort] ",
+                    default="retry",
+                ).lower()
+
+                if response == "retry":
+                    self.revert_to_checkpoint(task)
+                    continue
+                elif response == "skip":
+                    return TaskStatus.COMPLETED
+                elif response == "abort":
+                    raise _AbortExecution()
+                else:
+                    return TaskStatus.FAILED
 
             # 5. Critique and self-correction loop
             while True:
@@ -131,7 +154,7 @@ class AiderPlusPM:
                         self.io.tool_error(
                             f"Tests failed for `{task.name}` after applying critique."
                         )
-                    return TaskStatus.FAILED
+                    return TaskStatus.FAILED  # For now, just fail
         else:
             # Standard execution without TDD
             coder = Coder.create(
@@ -173,17 +196,34 @@ class AiderPlusPM:
                     task.status = TaskStatus.IN_PROGRESS
                     in_progress_tasks.add(task.id)
 
-                for future in as_completed(futures):
-                    task = futures[future]
-                    try:
-                        result_status = future.result()
-                        task.status = result_status
-                        if result_status == TaskStatus.COMPLETED:
-                            completed_tasks.add(task.id)
-                    except Exception as e:
-                        if self.io:
-                            self.io.tool_error(f"Error executing task {task.name}: {e}")
-                        task.status = TaskStatus.FAILED
-                    finally:
-                        in_progress_tasks.remove(task.id)
-                        self.save_state()
+                try:
+                    for future in as_completed(futures):
+                        task = futures[future]
+                        try:
+                            result_status = future.result()
+                            task.status = result_status
+                            if result_status == TaskStatus.COMPLETED:
+                                completed_tasks.add(task.id)
+                        except _AbortExecution:
+                            if self.io:
+                                self.io.tool_error(f"Execution aborted during task {task.name}.")
+                            task.status = TaskStatus.FAILED
+                            # This will cause the outer loop to break
+                            # because no new tasks will be runnable.
+                            # We need to explicitly cancel remaining futures.
+                            for f in futures:
+                                f.cancel()
+                            return
+                        except Exception as e:
+                            if self.io:
+                                self.io.tool_error(f"Error executing task {task.name}: {e}")
+                            task.status = TaskStatus.FAILED
+                        finally:
+                            in_progress_tasks.remove(task.id)
+                            self.save_state()
+                except KeyboardInterrupt:
+                    if self.io:
+                        self.io.tool_error("Execution interrupted.")
+                    for f in futures:
+                        f.cancel()
+                    return

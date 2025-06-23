@@ -393,21 +393,98 @@ class TestPM(unittest.TestCase):
                 test_cmd="pytest",
             )
             pm.state.tasks = [task]
+            pm.revert_to_checkpoint = MagicMock()
 
-            # Mock Coder to do nothing
-            MockCoderCreate.return_value = MagicMock()
+            # Mock Coder instances
+            mock_coder_test = MagicMock()
+            mock_coder_impl_fail = MagicMock()
+            mock_coder_impl_success = MagicMock()
+            mock_reviewer = MagicMock()
+            mock_reviewer.partial_response_content = ""
+            MockCoderCreate.side_effect = [
+                mock_coder_test,
+                mock_coder_impl_fail,
+                mock_coder_impl_success,
+                mock_reviewer,
+            ]
 
-            # Mock run_cmd to fail once, then succeed
-            mock_run_cmd.side_effect = [(1, "tests failed"), (0, "tests passed")]
+            # Mock run_cmd to fail after 1st impl, then succeed after retry
+            mock_run_cmd.side_effect = [
+                (1, "tests failed before impl"),  # After test coder
+                (1, "tests failed after impl"),  # After 1st impl coder
+                (0, "tests passed after retry"),  # After 2nd impl coder
+            ]
 
             # Mock user choosing 'retry'
-            pm.io.get_input.return_value = "retry"
+            mock_io.get_input.return_value = "retry"
 
             pm.execute_plan()
 
-            # Verify that run_cmd was called twice (initial fail, then retry success)
-            self.assertEqual(mock_run_cmd.call_count, 2)
+            # Verify that run_cmd was called three times
+            self.assertEqual(mock_run_cmd.call_count, 3)
             # Verify user was asked to retry
-            pm.io.get_input.assert_called_once()
+            mock_io.get_input.assert_called_once()
             # Verify task is marked as completed
             self.assertEqual(task.status, TaskStatus.COMPLETED)
+            # Verify both implementation attempts were made
+            mock_coder_impl_fail.run.assert_called_once()
+            mock_coder_impl_success.run.assert_called_once()
+            # Verify we reverted before retrying
+            pm.revert_to_checkpoint.assert_called_once_with(task)
+
+    @patch("aider.plus.pm.AIEngineeringTeam")
+    @patch("aider.coders.Coder.create")
+    @patch("aider.plus.pm.run_cmd")
+    def test_execute_plan_with_failure_and_skip(self, mock_run_cmd, MockCoderCreate, MockTeam):
+        with GitTemporaryDirectory() as repo_dir:
+            task = Task(name="Task A")
+            mock_io = MagicMock()
+            pm = AiderPlusPM(
+                repo=MagicMock(),
+                root=repo_dir,
+                main_model=MagicMock(),
+                io=mock_io,
+                test_cmd="pytest",
+            )
+            pm.state.tasks = [task]
+            MockCoderCreate.return_value = MagicMock()
+            mock_run_cmd.side_effect = [(1, "fail"), (1, "fail")]
+            mock_io.get_input.return_value = "skip"
+
+            pm.execute_plan()
+
+            self.assertEqual(mock_run_cmd.call_count, 2)
+            mock_io.get_input.assert_called_once()
+            self.assertEqual(task.status, TaskStatus.COMPLETED)
+
+    @patch("aider.plus.pm.AIEngineeringTeam")
+    @patch("aider.coders.Coder.create")
+    @patch("aider.plus.pm.run_cmd")
+    def test_execute_plan_with_failure_and_abort(self, mock_run_cmd, MockCoderCreate, MockTeam):
+        with GitTemporaryDirectory() as repo_dir:
+            task_a = Task(name="Task A")
+            task_b = Task(name="Task B")
+            mock_io = MagicMock()
+            pm = AiderPlusPM(
+                repo=MagicMock(),
+                root=repo_dir,
+                main_model=MagicMock(),
+                io=mock_io,
+                test_cmd="pytest",
+            )
+            pm.state.tasks = [task_a, task_b]
+            mock_coder_instance = MagicMock()
+            MockCoderCreate.return_value = mock_coder_instance
+            mock_run_cmd.side_effect = [(1, "fail"), (1, "fail")]
+            mock_io.get_input.return_value = "abort"
+
+            pm.execute_plan()
+
+            self.assertEqual(mock_run_cmd.call_count, 2)
+            mock_io.get_input.assert_called_once()
+            self.assertEqual(task_a.status, TaskStatus.FAILED)
+            self.assertEqual(task_b.status, TaskStatus.PENDING)
+            mock_coder_instance.run.assert_called_with(
+                with_message="Write a failing test for: Task A"
+            )
+            self.assertEqual(mock_coder_instance.run.call_count, 2)
