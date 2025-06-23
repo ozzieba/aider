@@ -46,6 +46,52 @@ These prompts are used to kick off a new project or a significant new feature. T
 
 > Please proceed with the production pipeline refactor implementation. Start with the high-level structure, leaving NotImplementedError or whatever as appropriate, and then go through and iteratively fill in the gaps. Also, make sure to create unit and component tests as you go
 
+> so we need to plan a substantial rewrite of our document ingestion pipeline (context: eDiscovery). Let's plan a presentation on a set of proposals for the next few months. Please start by getting the following thoughts down into Markdown...
+
+> { Let's refactor the batch production pipeline...; also, let's start by creating the .dat and .opt ... }
+
+> Please proceed with the production pipeline rewrite implementation. Start with tests, and apply TDD methodlogy. ...
+
+> let's emphasize that duckdb (distributed join) can be thought of as either a complement or replacement for the recomputation service ...
+
+> { let's talk about Nuix ... }
+
+> { Let's talk about AVFS. ... }
+
+> For refactoring Ingestions, it's basically the same story as productions...
+
+> for versioning/lineage/provenance, ... nix is probably the model here...
+
+> For queuing system, basically we need to decide whether to replace Sidekiq ...
+
+> let's design a new object-oriented, pure-functional, declarative-transformation approach to ingestion...
+
+> make the script modular, easy to understand etc; use a functional coding style, with methods instead of temporary variables; strcture the files as an abstract, high-level method calling other methods, progressively lower level, so each method is written in a functional style except the outermost method which is ~1 imperative instruction (eg, "write RD report to csvv")
+
+> before actually starting, write a detailed plan in a markdown file (detailed enough to be implemented by a team of junior developers), that includes the essence of this instruction message and any other relevant context; keep this file updates as you go
+
+> let's iterate through all produced zips
+
+> open them, if necessary with a password from a csv
+
+> get the dat file from zip_root/*/Data/*.DAT
+
+> get all the produced files, bates numbers, filenames, etc from the dat files
+
+> if possible, get md5 hashes also
+
+> separately, query both PG (via Rails), for the current file metadata (rd ID, file_name, md5, etc) and all sqlite databases at /mnt/shared/keyera/record_datum_batches/*/output/metadata.db, and/or JSONS at output/metadata.json for the original file metadata at ingestion
+
+> store all intermediate/compiled data in lancedb (again, via PyCall.rb)
+
+> store all metadata and data pointers (ie, where on GCS to find the doc) in a consolidated table
+
+> present a report on the mapping from incoming ingestion rows (by batch_id, row_id in sqlite/json, and matched via md5 if possible or filename if necessary) to the latest outgoing production bates numbers
+
+> likewise, present a report on bates number ranges and which versions of which productions they appeared in (again, consolidate adjacent ranges if they appeared in the same outgoing production)
+
+> so our next long-term goal is to refactor the produce_batch pipeline, including `ProduceRecordDatum`, using this Transformations methodologies. Please write a detailed design doc of what we will need for that. ...
+
 ### 2. Implementation & Refactoring
 
 These prompts are for making specific, significant changes to the codebase. They are more concrete than goal-setting prompts but still grant the AI autonomy to figure out the implementation details across multiple files.
@@ -141,6 +187,38 @@ These prompts are for making specific, significant changes to the codebase. They
 > ah writing to Lance is taking forever since we're doing it one record at a time; should be in large batches (remember it's GCS); also make sure the whole process is idempotent
 
 > let's make the rake tasks output to a logs dir; also, # bundle exec rake production_audit:recon:all
+
+> ok, so mow it updates when starting a job but not after finishing... let's just have it run update_metrics every 60 seconds in a loop. Otherwisr let's keep the logic though (eg the EWMA stuff)
+
+> ok so we might as well remove the middleware and just do everything in the job, right? Or is there some reason to have both? I'll delete the middleware file, just make the rest of the cjanges
+
+> need to fix the job update_metrics method, it should be incrementing at the beginning and decrementing at the end. Also, let's have a thread that updates the metrics at startup and every 60 seconds after
+
+> let's add a migration numbered 55500001 that runs `CreateLanceDbIndex` on all existing batches
+
+> let's edit `CreateLanceDbIndex` and `BatchedCreateEmbeddingsJob` so that for each batch of 250*96 chunks, first check if lanceDB already has all the exepected rows (by chunk id) and columns, then check if we can get positions and/or embeddings from Elastic, and if that fails call `chunks_to_tokens_mapping` and Cohere.embed
+
+> let's make review batches have Lance tables also. after creating, call `new_table.merge_insert`.whens.execute(old_table.to_lance) for each old table
+
+> I don't think we can pass a lambda like that as next_callback, it won't get properly (de)serialized... let's have add a proper method to the `BulkOperation`::CreateReviewBatch class, and pass the module/class and method names plus args rather than a lambda. keep the bulkop/review batch logic in that class though, not in the lance module
+
+> in `BatchedCreateEmbeddingsJob`, the db query to get the relevant chunks is very expensive; it works much faster if we can add a filter WHERE chunks.id between min_chunk AND max_chunk; luckily, getting those values is not super expensive; so let's get those min and max values for the batch in `CreateLanceDbIndex`, and then pass them (optionally) into the job and use them
+
+> Please pull out the Lance table / embeddings creation from `ProcessingCallback` which calls `BatchedCreateEmbeddingsJob` into a standalone sidekiq job
+
+> so we're going to follow through on the plans in gdocs_rdlcs.md; let's start by pulling out the create_chunks transformation into its own stateless method; make the minimal changes to call it as a stateless method, pass it an arrow table with RD text, and get back an arrow table with chunks, including embeddings
+
+> let's add another and_then step that doesn't use the do notation, eg a "redaction" step
+
+> let's clean up unnecessary/stale comments in app/services/transformations, and in the code that directly uses the transformations
+
+> let's parallelize. Also, let's not move the whole zips around nor decompress them; instead, use gcsfuse to access them as regular files (I ran gcsfuse --implicit-dirs /mnt/gcs) and then 7z or whatever to extract just the DATs
+
+> let's use duckdb (via pycall.rb) instead of Ruby's built-in csv parsing; also, let's put all dats in /mnt/shared/oz/dats/{batch_id}-{batch name}-{timestamp}.dat
+
+> after verifying that the table is created, let's make sure it has approprioate scalar indices (use table.list_indices, verify the length, and if it doesn't exist use create_scalar_index(column: str, *, replace: bool = True, index_type: Literal['BTREE', 'BITMAP', 'LABEL_LIST'] = 'BTREE'))
+
+> for the bates range report, use duckdb joins rather than pandas apply; generally, each row should represent a contiguous range of bates numbers where all the numbers are in the same set of production files (ie, between bates_begin and bates_ned for some row in the dat file); for each such consolidated range, show me bates_begin, bates_end, production files
 
 ### 3. Debugging & Troubleshooting
 
@@ -260,6 +338,24 @@ These are reactive prompts used when an error occurs. The user provides context 
 
 > NameError: uninitialized constant ProductionAudit::Recon (NameError)
 
+> Let's add some logging to figure out what the issue is
+
+> hmm, still getting no real logs
+
+> hmm, still getting no real logs, I think it's not even getting to the callback
+
+> there is no LnceSearch.batch_search, use the same methods as batch_import.py and the associated files
+
+> ah the steps progress is reset to zero in the callback, so the final  progress is 20
+
+> hmm, should be many rows # cat tmp/production_audit/reports/bates_ranges.csv_20250221_101841.csv ...
+
+> hmm, bates report seems to be writing one csv row at a time, and overwriting itself each time...
+
+> Should RD2.is_slip_sheeted? be returning true? Can we fix this test, or would more logging help?
+
+> hmm, something is doing substitution or something... Extracting with command: 7z x -so -p'h:T'(wb5l@.[KV/g+2-4'(wb5l@.[KV/g+2-4' ... Syntax error: "(" unexpected
+
 ### 4. Code Analysis & Explanation
 
 These prompts leverage the AI for code comprehension and analysis without requesting any code changes. This includes asking for architectural advice or exploring different implementation strategies.
@@ -321,6 +417,86 @@ These prompts leverage the AI for code comprehension and analysis without reques
 > the reporting is looking at the copied zips, right?
 
 > `/ask what do I need to do to make this accessible using .where etc, like ActiveRecord`
+
+> as you go, if you're not sure about the structure of the files or something, create a "recon" script that checks whatever you need and I'll run it.
+
+> why wouldn't to_csv work?
+
+> wait, are we using the updater correctly?
+
+> but did we create a new step without adding it to the list of steps
+
+> /ask can you confirm in general we're sorting the data from ES and PG by chunk id?
+
+> /ask how would I do that query but specifically retrieve id, chunk_order, where chunk order is rank over (referent)
+
+> /ask one-liner please (for rails c), with min_id 1255785631, max_id 1259611106
+
+> /ask but also with the batch filter
+
+> is there a good way to generate splits of the chunk id space that have a given number (24k) of rows?
+
+> what's find_by_sql? This is not returning anythign when I run it from the console (empty list), are you sure the templating logic is right?
+
+> the query works in psql
+
+> will retries use appropriate backoff?
+
+> merge_insert generally can't be run at the same time as compact_files. Let's keep track in Redis of the number of rows since the last compact_files/create_index/optimize_indices, including rows of in-progress operations. Poll/subscribe/wait for that number to be below the threshold before running any merge_insert; also have a "lock" for the worker that's actually running the compactions etc
+
+> /ask what's the simplest way to make sure we don't deadlock if some worker dies without decrementing the active_inserts counter?
+
+> /ask if redis.expire is called repeatedly, does it expire at the first or last deadline?
+
+> how would you make this `SyncLanceTables` job/module better?
+
+> how would you make this sync_lance_tables module more concise?
+
+> can we get all the data from the db in one or two queries (with joins as appropriate)?
+
+> /ask wait, we want to cache the vectorized results on a (batch_size) partition-level, not just for individual records... and then use that cache for the singleton method also... what's the best way to fix this?
+
+> /ask can we use CacheUtils for this shared/vectorized cache also
+
+> let's not call create_table if the table already exists (try opening it), since that actually drops it and recreates. And let's call close_table right after creation, since that will just create the indexes which we do want.
+
+> /ask how might we ensure that table.optimize is called roughly every 100k rows (doesn't need to be at all exact)?
+
+> /ask will "/" be integer division
+
+> /ask how exactly does this range consolidation work
+
+> in your example, what is `min(prev_end)` (shouldn't it just be prev_end?)? Also, how are you getting from throwing away range 2 to aggregating to Range A and B?
+
+> /ask in ruby, is there a way to define models across multiple files? I know I could use concerns, but I'm thinking of non-reusable pieces
+
+> how will retries, dlq, partial success work (in particular, consider running a bunch of tasks in parallel, some succeed and some don't)?
+
+> should eg attempt# be part of Result?
+
+> should we explicitly track retriable vs final errors differently in the Result type?
+
+> do we also want a distinct http-style status field, rather than just binary success/failure? Eg for partial success? Do we want to allow both a value and an error to be populated?
+
+> /ask in ruby, can I do the same *args/**kwargs stuff that I can in Python?
+
+> /ask in Ruby is there an equivalent of Python __call__() to define a callable object?
+
+> /ask so do I want to define transformations as methods or objects with .call? or something else?
+
+> /ask hmm, seems to me like that pattern ia better suited to thinga that have state
+
+> /ask this distinction between "setup" args and "runtime" args feels arbitrary; why not just use a method, and curry with a lanbda if needed?
+
+> /ask except the whole point is to keep these transformations stateless...
+
+> /ask do you see any that have relevant private methods? I'm not sure whether I'm just biased towards a more functional (but maybe less-Ruby-idiomatic) way of looking at things, or I'm actually missing a funamental advantage of the service object approach...
+
+> /ask can we make it easier to call `FromTokens` or any other transformation on the document pages of an RD? We could make transformations take arrays/sets/hashes of files rather than directories, or I suppose we could have a separate transformation to create a directory from existing files (perhaps by linking rather than copying)... Maybe we could do a virtual directory class that can be used as a directory in Ruby but isn't actually on the filesystem perhaps backed by a simple hash of name->existing file... idk I don't love any of those options, what do you think makes the most sense?
+
+> /ask how sure are you that you're not breaking the dev env?
+
+> can't we have `CreateLanceDbIndex` take a callback class/method/block and call it when the `BatchedCreateEmbeddingsJob`s are done?
 
 ### 5. Iterative Refinement & Clarification
 
@@ -472,6 +648,10 @@ These are small, tactical commands for precise changes. They leave little room f
 
 > +no need to set db_name explicitly, that should picked up automatically from the environment using base.get_db_name()
 
+> please fix the failing tests (we likely have to change some tests to align with latest framework changes)
+
+> in general when just returning a single file a hash is unnecessary (though eventually it gets wrap;ed in a Result along with stdout/stderr/exceptions
+
 ### 7. Generating Documentation & Scripts
 
 These prompts ask the AI to generate artifacts that are not production code, such as documentation, design docs, scripts, or presentations.
@@ -502,6 +682,16 @@ These prompts ask the AI to generate artifacts that are not production code, suc
 
 > `+let's find gaps in bates numbers (again, python/duckdb oneliner please`
 
+> please write a test script that finds the url and pw, uploads a gem, and downloads it
+
+> please generate a script to store all the secrets in GCP secrets manager; also generally the dev project is syllo-6ce5
+
+> let's add a diagram, perhaps using mermaid, of all the above models and properties, and their derivations with dependencies
+
+> let's add a script to actually create the diagrams by reading the md, isolating the mermaid code, and running mermaid
+
+> let's now embed the resulting images in the markdown, with the mermaid code as alt text or something (so that it's hidden)
+
 ### 8. Tooling & Environment Setup
 
 This category includes prompts related to setting up the development, testing, and deployment environment. This includes Continuous Integration (CI) configuration, test harnesses, and managing dependencies.
@@ -527,6 +717,46 @@ This category includes prompts related to setting up the development, testing, a
 > `+I'm trying to use pycall, and need to make sure it is only initialized by pycall_thread, not alone. How can I make sure that Rails doesn't 'require' it implicitly?`
 
 > `+let's run this only when running sidekiq, not rails server (in particular, in rails server pods Python isn't available, so maybe detect that or rescue or something; or only run in sidekiq and rails console)`
+
+> hmm, ok instead of making everything work in SQLite, let's run tests against a pg db, with connection params defined by env vars, and have a script that sets up a test db in docker and runs tests against it
+
+> Let's use a more recent PG, v17. and let's make sure to use db:schema:load rather than db:migrate; and if needed explicitly create extension pgvector or whatever
+
+> ah I think it actually is vector rather than pgvector
+
+> let's add a configurable python path env var that will also be appended to sys.path
+
+> ah let's make sure that also runs during tests
+
+> let's add a test suite for all functionality of lance that we are using (in particular, through pyrbrs); this should not use any other external data sources, just lance on disk
+
+> Please change the source of the pyrbrs gem to pull from gemstash (running on Cloud Run), and make sure that GH Actions can log in to pull it
+
+> so we don't have rails_helper, only spec_helper; that's seemingly necessary to import everything, but also unnecessarily connects to a db (which I don't have set up and don't need for these particular tests). Can we add a slimmed-down helper that just does the minimum
+
+> now let's use it for tests, instead of PG which we use for prod
+
+> let's make tests spin up PG as needed. In particular, if there is no PG_URL or equivalent env var, we should spin up a docker container with pg. In GHA, we should use service containers and actually run rspec (in parallel with building and pushing the docker image)
+
+> if the local container already exists (in particular, if it was created by tests running for a different branch), use it with a new logical db
+
+> ah need pgvector
+
+> no, db:migrate fails because some old migrations are broken; need db:schema:load; if schema.rb is stale we should fix it and commit
+
+> both locally and in GHA, let's pass GCP creds, in particular for S3/GCS to work
+
+> if we're going to wrap, let's just exclude GHA
+
+> hold on, _developer should still work for the local (non-GHA, but docker compose) developer environment
+
+> use syllo-6ce5 and the correct SA for api repo
+
+> to be clear, this is specifically for the script that grants permissions
+
+> does viewer include secretsAccessor?
+
+> what do we need to do to get rspec to exit with 0 if there are pending tests but no failing tests?
 
 ## General Observations & Best Practices
 
