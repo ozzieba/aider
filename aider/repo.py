@@ -647,12 +647,7 @@ class GitRepo:
                 match = re.match(r"stash@\{(\d+)\}", ref)
                 if match:
                     index = int(match.group(1))
-
-                    class MockStash:
-                        def __init__(self, msg):
-                            self.message = msg
-
-                    return index, MockStash(message)
+                    return index, True  # Return index and a non-None value for stash
         return None, None
 
     def create_task_stash(self, task_id, message):
