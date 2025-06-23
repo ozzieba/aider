@@ -6,6 +6,7 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 from aider.plus.pm import AiderPlusPM
+from aider.plus.prompts import PlusPrompts
 from aider.plus.state import Task, TaskStatus, WorkflowState
 from aider.utils import GitTemporaryDirectory, IgnorantTemporaryDirectory
 
@@ -220,7 +221,7 @@ class TestPM(unittest.TestCase):
 
             # Verify test coder was run
             mock_coder_test.run.assert_called_once_with(
-                with_message="Write a failing test for: Refactor hello function"
+                with_message=f"{PlusPrompts.test_writer_system}\n\nFeature: Refactor hello function"
             )
 
             # Verify run_cmd was called three times
@@ -228,24 +229,21 @@ class TestPM(unittest.TestCase):
             mock_run_cmd.assert_any_call("pytest")
 
             # Verify implementation coder was run
-            mock_coder_impl.run.assert_called_once_with(
-                with_message=(
-                    "Implement the feature for: Refactor hello function to make the test pass."
-                )
+            impl_prompt = (
+                f"{PlusPrompts.implementer_system}\n\nFeature: Refactor hello function\n\nFailing"
+                " test output:\ntests failed"
             )
+            mock_coder_impl.run.assert_called_once_with(with_message=impl_prompt)
 
             # Verify reviewer1 was run
-            mock_coder_reviewer1.run.assert_called_once_with(
-                with_message="Critique the implementation for: Refactor hello function"
-            )
+            critique_prompt = f"{PlusPrompts.reviewer_system}\n\nFeature: Refactor hello function"
+            mock_coder_reviewer1.run.assert_called_once_with(with_message=critique_prompt)
 
             # Verify fixer was run
             mock_coder_fixer.run.assert_called_once_with(with_message="This can be improved.")
 
             # Verify reviewer2 was run
-            mock_coder_reviewer2.run.assert_called_once_with(
-                with_message="Critique the implementation for: Refactor hello function"
-            )
+            mock_coder_reviewer2.run.assert_called_once_with(with_message=critique_prompt)
 
             # Verify task status and state saving
             self.assertEqual(task.status, TaskStatus.COMPLETED)
@@ -302,7 +300,7 @@ class TestPM(unittest.TestCase):
 
             # Verify test coder was run
             mock_coder_test.run.assert_called_once_with(
-                with_message="Write a failing test for: Refactor hello function"
+                with_message=f"{PlusPrompts.test_writer_system}\n\nFeature: Refactor hello function"
             )
 
             # Verify run_cmd was called twice
@@ -310,15 +308,15 @@ class TestPM(unittest.TestCase):
             mock_run_cmd.assert_any_call("pytest")
 
             # Verify implementation coder was run
-            mock_coder_impl.run.assert_called_once_with(
-                with_message="Implement the feature for: Refactor hello function to make the test"
-                " pass."
+            impl_prompt = (
+                f"{PlusPrompts.implementer_system}\n\nFeature: Refactor hello function\n\nFailing"
+                " test output:\ntests failed"
             )
+            mock_coder_impl.run.assert_called_once_with(with_message=impl_prompt)
 
             # Verify reviewer was run
-            mock_reviewer.run.assert_called_once_with(
-                with_message="Critique the implementation for: Refactor hello function"
-            )
+            critique_prompt = f"{PlusPrompts.reviewer_system}\n\nFeature: Refactor hello function"
+            mock_reviewer.run.assert_called_once_with(with_message=critique_prompt)
 
             # Verify task status and state saving
             self.assertEqual(task.status, TaskStatus.COMPLETED)
@@ -427,8 +425,17 @@ class TestPM(unittest.TestCase):
             # Verify task is marked as completed
             self.assertEqual(task.status, TaskStatus.COMPLETED)
             # Verify both implementation attempts were made
-            mock_coder_impl_fail.run.assert_called_once()
-            mock_coder_impl_success.run.assert_called_once()
+            impl_prompt1 = (
+                f"{PlusPrompts.implementer_system}\n\nFeature: Task A\n\nFailing test"
+                " output:\ntests failed before impl"
+            )
+            mock_coder_impl_fail.run.assert_called_once_with(with_message=impl_prompt1)
+
+            impl_prompt2 = (
+                f"{PlusPrompts.implementer_system}\n\nFeature: Task A\n\nFailing test"
+                " output:\ntests failed after impl"
+            )
+            mock_coder_impl_success.run.assert_called_once_with(with_message=impl_prompt2)
             # Verify we reverted before retrying
             pm.revert_to_checkpoint.assert_called_once_with(task)
 

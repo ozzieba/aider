@@ -2,6 +2,7 @@ import json
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
+from aider.plus.prompts import PlusPrompts
 from aider.plus.state import Task, TaskStatus, WorkflowState
 from aider.plus.team import AIEngineeringTeam
 from aider.run_cmd import run_cmd
@@ -53,9 +54,43 @@ class AiderPlusPM:
     def make_plan(self, goal):
         """
         Uses an LLM to break down the user's goal into a multi-step plan.
-        This is a placeholder and will be implemented in a future step.
         """
-        pass
+        from aider.coders import Coder
+
+        planner = Coder.create(
+            main_model=self.team.get_coder(),  # Or a dedicated planner model
+            io=self.io,
+            repo=self.repo,
+        )
+
+        messages = [
+            {"role": "system", "content": PlusPrompts.planner_system},
+            {"role": "user", "content": f"Here is the goal: {goal}"},
+        ]
+        # For now, we will use a non-interactive response
+        response = planner.main_model.simple_send_with_retries(messages)
+
+        if not response:
+            return None
+
+        try:
+            plan_data = json.loads(response)
+            tasks_data = plan_data.get("tasks", [])
+
+            tasks = [Task(name=td["name"]) for td in tasks_data]
+            index_to_id = {i: task.id for i, task in enumerate(tasks)}
+
+            for i, td in enumerate(tasks_data):
+                dep_indices = td.get("dependencies", [])
+                tasks[i].dependencies = [index_to_id[dep_index] for dep_index in dep_indices]
+
+            plan = WorkflowState(goal=goal, tasks=tasks)
+            return plan
+        except (json.JSONDecodeError, KeyError, IndexError) as e:
+            if self.io:
+                self.io.tool_error(f"Error parsing plan from LLM: {e}")
+                self.io.tool_output(f"LLM response:\n{response}")
+            return None
 
     def create_checkpoint(self, task):
         """Creates a git stash checkpoint for the given task."""
@@ -82,10 +117,12 @@ class AiderPlusPM:
                 io=self.io,
                 repo=self.repo,
             )
-            test_coder.run(with_message=f"Write a failing test for: {task.name}")
+            test_coder.run(
+                with_message=f"{PlusPrompts.test_writer_system}\n\nFeature: {task.name}"
+            )
 
             # 2. Run the test, expect failure
-            exit_code, _ = run_cmd(self.test_cmd)
+            exit_code, output = run_cmd(self.test_cmd)
             if exit_code == 0:
                 if self.io:
                     self.io.tool_warning(
@@ -101,10 +138,11 @@ class AiderPlusPM:
                     io=self.io,
                     repo=self.repo,
                 )
-                impl_coder.run(
-                    with_message=f"Implement the feature for: {task.name} to make the test"
-                    " pass."
+                impl_prompt = (
+                    f"{PlusPrompts.implementer_system}\n\nFeature: {task.name}\n\nFailing test"
+                    f" output:\n{output}"
                 )
+                impl_coder.run(with_message=impl_prompt)
 
                 # 4. Run the test, expect success
                 exit_code, output = run_cmd(self.test_cmd)
@@ -139,7 +177,8 @@ class AiderPlusPM:
                 reviewer = Coder.create(
                     main_model=self.team.get_reviewer(), io=self.io, repo=self.repo
                 )
-                reviewer.run(with_message=f"Critique the implementation for: {task.name}")
+                critique_prompt = f"{PlusPrompts.reviewer_system}\n\nFeature: {task.name}"
+                reviewer.run(with_message=critique_prompt)
                 critique = reviewer.partial_response_content.strip()
 
                 if not critique:
