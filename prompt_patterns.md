@@ -92,6 +92,8 @@ These prompts are used to kick off a new project or a significant new feature. T
 
 > so our next long-term goal is to refactor the produce_batch pipeline, including `ProduceRecordDatum`, using this Transformations methodologies. Please write a detailed design doc of what we will need for that. ...
 
+> please continue collecting, categorizing, and annotating all the distinct prompts used in the .aider.input.history file(s) into `prompt_patterns.md`. Try to actually include every substantially distinct prompt in full (except eg content of logs/stack traces etc), don't discard much
+
 ### 2. Implementation & Refactoring
 
 These prompts are for making specific, significant changes to the codebase. They are more concrete than goal-setting prompts but still grant the AI autonomy to figure out the implementation details across multiple files.
@@ -236,6 +238,22 @@ These prompts are for making specific, significant changes to the codebase. They
 
 > let's define a way to retrieve error information from a failed transformation, including chained transformations
 
+> let's make `ChainedPipeline` able to take multiple args, working more like a Head|Tail list than pure binary cons
+
+> let's update the Sidekiq orchestrator to be able to handle sequential chains and pure transformations as well as parallel. use some kind of callback if needed
+
+> let's test the new functionality
+
+> I think we should rename from_files to `from_attachments`, and allow more general specification of which AR models/attachments to use... but also that's not really a stateless transformation, let's properly separate the separate and stateless parts; stateful part can be a service but not a transformation
+
+> hmm, actually I think we should do Directory::FromFiles, but actually make it take just file paths; and then the Attachment provider can provide those
+
+> let's implement `TypedSqlite` and use it for tests
+
+> now let's use it for tests, instead of PG which we use for prod
+
+> I'm trying to use sqlite for tests, and monkey-patch whatever we need to make it work with the pg-centered existing code... please help
+
 ### 3. Debugging & Troubleshooting
 
 These are reactive prompts used when an error occurs. The user provides context about the failure (error messages, stack traces, symptoms) and asks for a fix.
@@ -373,6 +391,28 @@ These are reactive prompts used when an error occurs. The user provides context 
 > hmm, something is doing substitution or something... Extracting with command: 7z x -so -p'h:T'(wb5l@.[KV/g+2-4'(wb5l@.[KV/g+2-4' ... Syntax error: "(" unexpected
 
 > let's handle nulls NoMethodError: undefined method `[]' for nil:NilClass (NoMethodError)
+
+> please fix merge conflicts
+
+> woops extra `====` remaining
+
+> do we need to set the loglevel for tests?
+
+> maybe the tmp file is being deleted before being checked?
+
+> looks like we still have unnecessary hash
+
+> ah we need to configure wkhtmltopdf to use system version if available
+
+> hmm, is that config being run for the tests?
+
+> hmm is that not in sidekiq/testing?
+
+> is there any cleanup we need to do, eg unused functions, stale comments, etc?
+
+> please fix that code (with SEARCH/REPLACE); also, why are all the tests passing, did we miss a test somewhere?
+
+> let's revert these changes, keep Documentable#text_from_tokens the way it was
 
 ### 4. Code Analysis & Explanation
 
@@ -527,6 +567,12 @@ These prompts leverage the AI for code comprehension and analysis without reques
 > /ask declarative pipeline sounds good, but ideally it would be directly reusable as a Pipeline object... How do we facilitate that? Can we eg make Pipeline.and_then build a new subclass of Pipeline?
 
 > I don't get it, what's the problem with just having slipsheet_if_needed return tge Conditional pipdline (without extra explicit classes)?
+
+> /ask please generate a thorough PR code review of this code (let me know if you need access to any files you don't have); see any architectural issues? Inconsistencies? is there any cleanup we need to do, eg stale comments, unused code?
+
+> /ask ok, now let's talk about the cleanup method; let's make it work on pipelines by recursively cleaning up intermediate outputs
+
+> /ask what do we need to do to get rspec to exit with 0 if there are pending tests but no failing tests?
 
 ### 5. Iterative Refinement & Clarification
 
@@ -696,6 +742,38 @@ This category captures the conversational nature of the interactions. The user p
 
 > /ask I _COMMAND_ you to give me an implementation with dynamic class generation and no |res,meta| boilerplate
 
+> do we need to do that anywhere else?
+
+> let's revert these changes, keep Documentable#text_from_tokens the way it was
+
+> let's make `GenerateRecordArtifacts` a bit more concise, in particular the actual logic of the core pipeline. eg move the particular config args to helper methods
+
+> can't we make it even more concise, and make the dataflow structure even more prominent and clear?
+
+> no builder class, don't change the transformation machinery
+
+> let's make `GenerateRecordArtifacts` look like slipsheet_if_needed.and_then(redact_if_needed).and_then(stamp)... etc, with each symbol defined underneath in a (module?) method
+
+> you'fe way overcomplicating; just def slipshest_if_needed `Conditional`() end
+
+> but slipshedt_if_needed just return the Conditional, it doesn't call it
+
+> no block, just call slipshest_if_needed, and have it return tgebConditional as applied to the if/elze branches priginally
+
+> let's also add extract_text_with_textract, by extracting the tokens.json and concatenating the token text
+
+> let's make sure the tokens are sorted by positions
+
+> for `ExtractTextWithTextract`, let's use RecordDatum::text_from_tokens
+
+> for `ExtractTextWithTextract`, let's use Documentable::text_from_tokens; but also let's make that its own trasformation instead of an object method
+
+> hmm, let's fix that failing test. Also, let's do a round-trip test from text to PDF to tokens to text. And generally let's prefer to take a single directory rather than an array of files
+
+> let's make the text for the round-trip test is multi-paragraph, multi-line, and multi-page
+
+> let's create a new class for a particular "partition" (shard? slice? obviously I can't say chunk; and "batch" is used for `RecordDatumBatch`...) of the chunks table, which can be constructed from a begin/end ID (defaulting to overall min/max of the table) and has all the relevant functionality to retrieve embeddings, positions, etc in a vectorized fashion; use that class in `SyncLanceTables::Main`; use a functional/declarative style, at least as much as now, and optimize for conciseness
+
 ### 6. Direct & Specific Instructions
 
 These are small, tactical commands for precise changes. They leave little room for ambiguity.
@@ -746,6 +824,32 @@ These are small, tactical commands for precise changes. They leave little room f
 
 > in general when just returning a single file a hash is unnecessary (though eventually it gets wrap;ed in a Result along with stdout/stderr/exceptions
 
+> actually, can't we just do rnage(chunks.count)?
+
+> no need for the logs, just make the whole method one or two lines
+
+> if you're using a ; you might as well make it two lines
+
+> for `BatchedCreateEmbeddingsJob`, let's use in_threads: 10 rather than in_processes: `MAX_PROCESSES`
+
+> actually might as well add the last chunk id also
+
+> please fix (just) the memoize methods
+
+> - no need for cache clearing
+
+> - make a helper method that either uses an instance variable and defines a singleton method, or uses a class variable and defines a class method, but either way does the same thing
+
+> use close_batch_table.py, not table.close, to create the indices
+
+> when creating the tables, make sure there is a scalar index on id
+
+> table.create_scalar_index(column="id") (if there is a PyCall::PyError error doing that, assume that index already exists and keep going)
+
+> at the end, call close_table
+
+> no need for explicit `with_gil_state`, that happens automatically now
+
 ### 7. Generating Documentation & Scripts
 
 These prompts ask the AI to generate artifacts that are not production code, such as documentation, design docs, scripts, or presentations.
@@ -785,6 +889,8 @@ These prompts ask the AI to generate artifacts that are not production code, suc
 > let's add a script to actually create the diagrams by reading the md, isolating the mermaid code, and running mermaid
 
 > let's now embed the resulting images in the markdown, with the mermaid code as alt text or something (so that it's hidden)
+
+> let's document the models as described in the transformations.md doc, with each model in its own md file, showing its structure, its relation to the concerns, all its relevant method signatures for the various arrows, and usage examples
 
 ### 8. Tooling & Environment Setup
 
@@ -857,6 +963,8 @@ This category includes prompts related to setting up the development, testing, a
 > please give me a command to checkout out generate_thumbnails_transform and apply all these changes (but not all the unrelated changes from this branch)
 
 > we're trying to cherry-pick minimal changes from api-transformations_productions to the current branch (generate_thunbnails_transformation) to the current branch, though generally only addressing files where current branch is different from main, looks like we need to pull in Pipeline also, please provide commands for that. Also check if there's anything else we're likely to need
+
+> please give me a command to find all files that were updated from origin/main to origin/generate_thumbnails_transform (also checked out as worktree in ../api-transformations) and for all of those files find the diff between generate_thumbnails_transform and HEAD/transformations_productions
 
 ## General Observations & Best Practices
 
