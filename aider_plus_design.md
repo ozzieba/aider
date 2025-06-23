@@ -742,6 +742,19 @@ This section provides a granular, step-by-step implementation plan for building 
     3.  **"Critique the implementation of [feature]"**: Send the new code and tests to a 'reviewer' agent. If the reviewer provides feedback, generate a new implementation sub-task and loop. If the reviewer approves, the main task is complete.
 *   **Tests:** In `tests/plus/test_pm.py`, add a test that mocks this TDD process. Mock the LLM to return a new test file, then mock `run_cmd` to return a failure. Mock the LLM again to return implementation code, then mock `run_cmd` to return success. Mock the LLM a final time to return a critique. Verify that the sequence of mocks is called in the correct order.
 
+### Phase 2: The Project Lead
+
+**Goal:** Implement the "Team Management" aspect of Aider+, allowing it to use specialized agents for different tasks.
+
+**Step 7: Introduce `AIEngineeringTeam` and role-based model configuration. (IN PROGRESS)**
+*   **Action:**
+    1.  Create a new `aider/plus/team.py` file with an `AIEngineeringTeam` class. This class will manage a collection of `aider.models.Model` instances based on roles ('coder', 'reviewer', 'test_writer').
+    2.  The `AIEngineeringTeam` constructor will accept a main model and role-specific model names from a new configuration section in `.aider.conf.yml`. It will provide methods like `get_coder()`, `get_reviewer()`, etc.
+    3.  Refactor `AiderPlusPM` to instantiate `AIEngineeringTeam` instead of using `self.main_model` directly. Update `execute_plan` to use `self.team.get_coder()` etc. to get the appropriate model for each sub-task (writing tests, implementing, critiquing).
+*   **Tests:**
+    1.  Create `tests/plus/test_team.py` to test `AIEngineeringTeam`. Verify that it correctly loads models based on configuration.
+    2.  Update `tests/plus/test_pm.py`'s `test_execute_plan_with_tdd_and_critique` to mock `AIEngineeringTeam` and verify that the correct role-based methods (`get_coder`, `get_reviewer`, etc.) are called for each step of the TDD cycle.
+
 ## Glossary
 
 | Term | Definition |
