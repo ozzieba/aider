@@ -706,7 +706,7 @@ This section provides a granular, step-by-step implementation plan for building 
     2.  `WorkflowState`: Represents the entire project plan. It should contain a `goal` (string) and a list of `Task` objects.
 *   **Tests:** Create `tests/plus/test_state.py`. Add unit tests to verify that `Task` and `WorkflowState` dataclasses can be instantiated correctly. Add tests for serialization to and from a dictionary to ensure JSON compatibility.
 
-**Step 2: Implement saving and loading of `WorkflowState`.**
+**Step 2: Implement saving and loading of `WorkflowState`. (DONE)**
 *   **Action:** Create a new file `aider/plus/pm.py` containing a placeholder `AiderPlusPM` class. Add `save_state()` and `load_state()` methods to this class. These methods will be responsible for serializing the `WorkflowState` to `.aider/workflow.json` and deserializing it back into memory.
 *   **Tests:** Create `tests/plus/test_pm.py`. Add tests for `save_state` and `load_state`. Use `pathlib.Path.read_text` and `write_text` with mocks to check that the methods write and read the correct JSON data. Test the edge case where `load_state` is called but `.aider/workflow.json` does not exist (it should create a new default state).
 
