@@ -374,6 +374,16 @@ These prompts are for making specific, significant changes to the codebase. They
 
 > I'm trying to use sqlite for tests, and monkey-patch whatever we need to make it work with the pg-centered existing code... please help
 
+> please fix the failing tests (we likely have to change some tests to align with latest framework changes)
+
+> great, now let's do it the same way in formats/zip.rs
+
+> let's revert these changes, keep Documentable#text_from_tokens the way it was
+
+> please implement #4, #5, #8, #9
+
+> Please proceed with 2-4
+
 ### 3. Debugging & Troubleshooting
 
 These are reactive prompts used when an error occurs. The user provides context about the failure (error messages, stack traces, symptoms) and asks for a fix.
