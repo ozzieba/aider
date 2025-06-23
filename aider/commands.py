@@ -1540,6 +1540,32 @@ class Commands:
         "Alias for /editor: Open an editor to write a prompt"
         return self.cmd_editor(args)
 
+    def cmd_plan(self, args):
+        "Create a plan to accomplish a goal"
+        if not args.strip():
+            self.io.tool_error("Please provide a goal for the plan.")
+            return
+
+        goal = args.strip()
+        pm = AiderPlusPM(repo=self.coder.repo, main_model=self.coder.main_model, io=self.io)
+        plan = pm.make_plan(goal)
+
+        if not plan or not plan.tasks:
+            self.io.tool_error("Unable to create a plan for the given goal.")
+            return
+
+        self.io.tool_output("Proposed plan:")
+        for i, task in enumerate(plan.tasks):
+            self.io.tool_output(f"{i+1}. {task.name}")
+
+        if self.io.confirm_ask("Approve this plan?"):
+            pm.state.goal = goal
+            pm.state.tasks = plan.tasks
+            pm.save_state()
+            self.io.tool_output("Plan approved and saved.")
+        else:
+            self.io.tool_output("Plan rejected.")
+
     def cmd_think_tokens(self, args):
         """Set the thinking token budget (supports formats like 8096, 8k, 10.5k, 0.5M, or 0 to disable)"""
         model = self.coder.main_model
