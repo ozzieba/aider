@@ -735,7 +735,7 @@ This section provides a granular, step-by-step implementation plan for building 
     5.  Update the task's status to 'completed' and save the `WorkflowState`.
 *   **Tests:** In `tests/plus/test_pm.py`, create a new test for `execute_plan`. Mock the LLM call to return a specific code change in edit block format. Provide a simple `WorkflowState` with one task. Verify that the target file is modified correctly and that the task's status is updated to 'completed' in `workflow.json`.
 
-**Step 6: Integrate a TDD cycle and self-critique loop. (IN PROGRESS)**
+**Step 6: Integrate a TDD cycle and self-critique loop. (DONE)**
 *   **Action:** Refactor `execute_plan()` to incorporate a TDD and self-critique workflow. When a task is for implementation, the PM should dynamically inject new sub-tasks into the plan:
     1.  **"Write a failing test for [feature]"**: Execute this task first. After it's done, run the specified `test_cmd`. The test should fail.
     2.  **"Implement [feature]"**: Execute this task. After, run `test_cmd` again. The test should now pass.

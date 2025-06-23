@@ -140,6 +140,90 @@ class TestPM(unittest.TestCase):
 
     @patch("aider.coders.Coder.create")
     @patch("aider.plus.pm.run_cmd")
+    def test_execute_plan_with_tdd_and_critique(self, mock_run_cmd, MockCoderCreate):
+        with GitTemporaryDirectory() as repo_dir:
+            repo_dir = Path(repo_dir)
+
+            # Mocks for Coder instances
+            mock_coder_test = MagicMock()
+            mock_coder_impl = MagicMock()
+
+            mock_coder_reviewer1 = MagicMock()
+            mock_coder_reviewer1.partial_response_content = "This can be improved."
+
+            mock_coder_fixer = MagicMock()
+
+            mock_coder_reviewer2 = MagicMock()
+            mock_coder_reviewer2.partial_response_content = ""
+
+            MockCoderCreate.side_effect = [
+                mock_coder_test,
+                mock_coder_impl,
+                mock_coder_reviewer1,
+                mock_coder_fixer,
+                mock_coder_reviewer2,
+            ]
+
+            # Mock for run_cmd: fail first, then succeed, then succeed again after fix
+            mock_run_cmd.side_effect = [
+                (1, "tests failed"),
+                (0, "tests passed"),
+                (0, "tests passed again"),
+            ]
+
+            pm = AiderPlusPM(
+                repo=MagicMock(),
+                root=repo_dir,
+                main_model=MagicMock(),
+                io=MagicMock(),
+                test_cmd="pytest",
+            )
+            task = Task(name="Refactor hello function")
+            pm.state.tasks = [task]
+
+            pm.create_checkpoint = MagicMock(return_value=True)
+            pm.save_state = MagicMock()
+
+            pm.execute_plan()
+
+            # Verify Coder creation
+            self.assertEqual(MockCoderCreate.call_count, 5)
+
+            # Verify test coder was run
+            mock_coder_test.run.assert_called_once_with(
+                with_message="Write a failing test for: Refactor hello function"
+            )
+
+            # Verify run_cmd was called three times
+            self.assertEqual(mock_run_cmd.call_count, 3)
+            mock_run_cmd.assert_any_call("pytest")
+
+            # Verify implementation coder was run
+            mock_coder_impl.run.assert_called_once_with(
+                with_message=(
+                    "Implement the feature for: Refactor hello function to make the test pass."
+                )
+            )
+
+            # Verify reviewer1 was run
+            mock_coder_reviewer1.run.assert_called_once_with(
+                with_message="Critique the implementation for: Refactor hello function"
+            )
+
+            # Verify fixer was run
+            mock_coder_fixer.run.assert_called_once_with(with_message="This can be improved.")
+
+            # Verify reviewer2 was run
+            mock_coder_reviewer2.run.assert_called_once_with(
+                with_message="Critique the implementation for: Refactor hello function"
+            )
+
+            # Verify task status and state saving
+            self.assertEqual(task.status, TaskStatus.COMPLETED)
+            pm.save_state.assert_called()
+
+    @patch("aider.coders.Coder.create")
+    @patch("aider.plus.pm.run_cmd")
     def test_execute_plan_with_tdd(self, mock_run_cmd, MockCoderCreate):
         with GitTemporaryDirectory() as repo_dir:
             repo_dir = Path(repo_dir)
