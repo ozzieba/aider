@@ -51,9 +51,29 @@ class AiderPlusPM:
             # If file is corrupted, malformed, or empty, start fresh
             return WorkflowState()
 
-    def make_plan(self, goal):
+    def make_design(self, goal):
         """
-        Uses an LLM to break down the user's goal into a multi-step plan.
+        Uses an LLM to create a design document for the user's goal.
+        """
+        from aider.coders import Coder
+
+        designer = Coder.create(
+            main_model=self.team.get_coder(),  # Or a dedicated designer model
+            io=self.io,
+            repo=self.repo,
+        )
+
+        messages = [
+            {"role": "system", "content": PlusPrompts.designer_system},
+            {"role": "user", "content": f"Here is the goal: {goal}"},
+        ]
+        response = designer.main_model.simple_send_with_retries(messages)
+
+        return response
+
+    def make_plan(self, goal, design_doc):
+        """
+        Uses an LLM to break down the approved design into a multi-step plan.
         """
         from aider.coders import Coder
 
@@ -63,9 +83,12 @@ class AiderPlusPM:
             repo=self.repo,
         )
 
+        content = f"Here is the approved design document:\n\n{design_doc}"
+        content += f"\n\nPlease create the implementation plan for the following goal: {goal}"
+
         messages = [
             {"role": "system", "content": PlusPrompts.planner_system},
-            {"role": "user", "content": f"Here is the goal: {goal}"},
+            {"role": "user", "content": content},
         ]
         # For now, we will use a non-interactive response
         response = planner.main_model.simple_send_with_retries(messages)
