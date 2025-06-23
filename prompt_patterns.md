@@ -24,6 +24,20 @@ These prompts are used to kick off a new project or a significant new feature. T
 
 > so we want to extend aider-chat... let's start by generating a design doc for our aider+ tool
 
+> let's add a new ActiveRecord model for Sidekiq jobs, with appropriate columns etc, so that we can easily access it from rails c in the same way we access regular db models (but without actually using the db)
+
+> {
+> Let's refactor the batch production pipeline. In particular:
+> - Let's vectorize, rather than doing everything one file (or even page) at a time
+> - Let's do everything idempotently
+> - Let's create new "stamped" RDs. Perhaps with a field that points to the original RD, rather than replacing the PDFs directly 
+> - Let's automatically slipsheet anything that doesn't have document_data and document pages
+> - Let's parallelize stamping across different pages of an RD
+> First, please write out a detailed design doc in a new Markdown file
+> }
+
+> Ok, let's do this right. In particular, let's have real scripts in Ruby with PyCall.rb (in PyCallThread.run) to interact with Python and DuckDB. The goal is to audit every production we've run, its bates numbers, and RD id numbers. Note we're generally using GCS via the S3 API, and with versioning turned on; so we can see all the old versions of produced zips.
+
 ### 2. Implementation & Refactoring
 
 These prompts are for making specific, significant changes to the codebase. They are more concrete than goal-setting prompts but still grant the AI autonomy to figure out the implementation details across multiple files.
@@ -36,9 +50,27 @@ These prompts are for making specific, significant changes to the codebase. They
 
 > please update the code in reviewer.py to use the firestore cache decorator from utils.py (instead of the existing firestore caching logic)
 
+> So I'd like to add sp cert validation support to our SAML integration. The pod will have a relevant tls cert mounted, so we need to provide it through devise to omniauth/saml and turn on signing
+
 > let's make import_batch sharded: * add a command that processes a particular shard, defined as id%n=i (use painless); * make import_batch spin up a statefulset or jobs with n pods that runs the import_shard command and cleans it up at the end
 
-> let's make our tests independent of external pg, and instead use pg_tmp/ephemeralpg
+> let's make sure update_metrics runs at least once when the process starts up
+
+> let's only do the the increment in the middleware, and the decrement in _perform; let's call the method update_processing_time; let's initialize the num eorkers etc to 0 if theyee uninitialized, and procesding time to 60.
+
+> so Nuix is now returning data in a sqlite db (called metadata.db, table tiems), rather than a big json... Let's make the necessary changes here to read that data
+
+> ok, now the sqlite database columns (as written by java for us to read) will have a prefix indicating type: n_ for numeric, s_ for string, b_ for boolean, d_ for date, and j_ for lists/hashes that should be JSON-parsed. Please update the logic accordingly
+
+> I have the following frontend code that currently talks to Elastic. Let's add a Rails route to perform the search instead. ... And instead of using Elastic, let's use lance, like so...
+
+> We are currently embedding docs one a time ... Let's instead create the embeddings in batched fashion, when the rest of the batch is ready (ie, in the callback), and store directly in LanceDB...
+
+> let's turn the ingestion_status field on RecordDatum into a computed field, ie scope with_ingestion_status, which automatically checks for the presence of document_data, original_binary, document_pages (or slipsheet tag) , chunks, tokens,   etc. Should all be done DB-side
+
+> let's replace `PyCallThread` with a multi-threaded version that does the following ...
+
+> let's add auto retry with exponential backoff for cohere embed
 
 ### 3. Debugging & Troubleshooting
 
@@ -58,11 +90,19 @@ These are reactive prompts used when an error occurs. The user provides context 
 
 > Doc-level Tagger seems to be incrementing twice per message a lot of the time, why would that be?
 
+> Hmm, getting an error DEBUG -- omniauth: (saml) Request phase initiated. + ERROR -- omniauth: (saml) Authentication failure! no implicit conversion of nil into String: TypeError, no implicit conversion of nil into String
+
+> we now have duplicate _perform_now methods
+
+> this is bottlenecked on 'select * from record_data where id=$1', which is from line 409: "referent = ref_type.constantize.find(ref_id)"; let's fix this n+1
+
+> weird getting Non-retryable HTTP status: 200 (Faraday::ClientError)
+
 ### 4. Code Analysis & Explanation
 
-These prompts leverage the AI for code comprehension and analysis without requesting any code changes.
+These prompts leverage the AI for code comprehension and analysis without requesting any code changes. This includes asking for architectural advice or exploring different implementation strategies.
 
-**Annotation:** This is a powerful pattern for getting up to speed on an unfamiliar codebase, planning a refactor, or investigating performance issues. The user treats the AI as a consultant or a peer who can quickly analyze code and provide insights.
+**Annotation:** This is a powerful pattern for getting up to speed on an unfamiliar codebase, planning a refactor, or investigating performance issues. The user treats the AI as a consultant or a peer who can quickly analyze code and provide insights. The `/ask` command is often used for these types of questions.
 
 **Examples:**
 
@@ -73,6 +113,20 @@ These prompts leverage the AI for code comprehension and analysis without reques
 > Please thoroughly analyze what happens when various components fail, and whether each document is indeed processed exactly once...
 
 > why is extractMetadata so slow? In particular, why is it so much slower than the equivalent code in the old (non-`broker`) Main.java?
+
+> is that redirect_to_new_user_registration_url implemented somewhere?
+
+> /ask where are we parsing dates?
+
+> /ask is there a good way to turn an arbitrary list/iterable/similar into an ActiveRecord connection adapter/model? Ie, be able to use the standard ActiveRecord interface (.where, .group, .columns) without actually talking to the db?
+
+> /ask tell me more about NullDB
+
+> /what's OPenStruct? why is it needed?
+
+> /ask So 1461309 is a child of 1461426; when running produce on their batch, we get 1461309 produced twice, with different bates numbers, once on its own and once as a child of 1426; any idea why it didn't get skipped (since its parent was in the batch)?
+
+> /ask I want to be able to think of all the data stores (GCS, filesystem, SQL, Elastic, Lance, sqlite...) as essentially caches of our immutable derivations. How can I express that in a way that works well with ActiveRecord and the above design? Show me different options and tradeoffs between them
 
 ### 5. Iterative Refinement & Clarification
 
@@ -89,6 +143,16 @@ This category captures the conversational nature of the interactions. The user p
 > much more detail please.
 
 > actually, let's shard by message_id%100
+
+> THat's not right, we want to be able to create new user dynamically from SAML info, as we were before
+
+> actually, instead of searching by vector, let's search by text and do the embedding on the backend
+
+> rather than explicit threads and mutexes, let's just use Parallel
+
+> wait, why is this a concern? Let's make it conceptually a single relation
+
+> no need to set db_name explicitly, that should picked up automatically from the environment, as in Python
 
 ### 6. Direct & Specific Instructions
 
@@ -108,6 +172,16 @@ These are small, tactical commands for precise changes. They leave little room f
 
 > let's change the metrics_sources so that each source defaults a configurable value (default 0)
 
+> use the k8s libraty, using in-cluster credentials
+
+> let's add a TODO in the Batched Embed jobs to also send the embeddings to Elastic
+
+> let's also sanitize all strings in the data bit, make sure everything is UTF8
+
+> for `BatchedCreateEmbeddingsJob`, let's use in_threads: 10 rather than in_processes: `MAX_PROCESSES`
+
+> let's round the time to the nearest 60 seconds, so it doesn't change more than once a minute and again the Firestore client should be initialized if and only if ENV['K8S'] exists (and its value will be "1")
+
 ### 7. Generating Documentation & Scripts
 
 These prompts ask the AI to generate artifacts that are not production code, such as documentation, design docs, scripts, or presentations.
@@ -123,6 +197,32 @@ These prompts ask the AI to generate artifacts that are not production code, suc
 > Please write a detailed design doc for a new sidekiq-jruby service that can run Java jobs.
 
 > please generate a pedagogic explanation of the code, how it's structured, what each part does, etc.
+
+> please write a Python scrip that uses duckdb's read_csv to select all from a bunch of DAT's in a directory
+
+> /ask now what's an actual oneliner, runnable from bash?
+
+> let's write a new doc called "Lifecycle of a Record Datum Improvements", suggesting directions for improvement of our current system
+
+### 8. Tooling & Environment Setup
+
+This category includes prompts related to setting up the development, testing, and deployment environment. This includes Continuous Integration (CI) configuration, test harnesses, and managing dependencies.
+
+**Annotation:** This shows the user leveraging the AI to manage the entire development lifecycle, including the operational aspects. Automating the setup and testing process is a common theme.
+
+**Examples:**
+
+> let's make tests spin up PG as needed. In particular, if there is no PG_URL or equivalent env var, we should spin up a docker container with pg. In GHA, we should use service containers and actually run rspec (in parallel with building and pushing the docker image)
+
+> I'm trying to use pycall, and need to make sure it is only initialized by pycall_thread, not alone. How can I make sure that Rails doesn't 'require' it implicitly?
+
+> will ENV["PYTHONPATH"] work, or do we need the one in the sys module? goal is to get import document_labeling.whatever to work (document_labeling is a subdirectory of /document-labeling)
+
+> instead of chdir to /document-labeling, we need to add it to the python path... and we need to do it globally, maybe in a config initializer?
+
+> please generate a script to store all the secrets in GCP secrets manager; also generally the dev project is syllo-6ce5
+
+> Let's use a sqlite db or something for testing
 
 ## General Observations & Best Practices
 
