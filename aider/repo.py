@@ -631,8 +631,8 @@ class GitRepo:
     def _find_stash_for_task(self, task_id):
         prefix = f"aider-plus-task:{task_id}:"
         try:
-            # The format gives lines like: stash@{0}:aider-plus-task:task_id:message
-            stashes_str = self.repo.git.stash("list", "--format=%gd:%gs")
+            # Use null bytes to separate fields to handle colons in messages
+            stashes_str = self.repo.git.stash("list", "--format=%gd%x00%gs")
         except git.exc.GitCommandError:
             return None, None
 
@@ -643,12 +643,12 @@ class GitRepo:
             if not line.strip():
                 continue
 
-            parts = line.split(":", 1)
+            parts = line.split("\x00", 1)
             if len(parts) != 2:
                 continue
 
             ref, message = parts
-            if message.lstrip().startswith(prefix):
+            if prefix in message:
                 match = re.match(r"stash@\{(\d+)\}", ref)
                 if match:
                     index = int(match.group(1))
