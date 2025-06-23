@@ -672,6 +672,8 @@ class GitRepo:
             self.io.tool_warning(f"No stash found for task {task_id}.")
             return False
         try:
+            self.repo.git.reset("--hard", "HEAD")
+            self.repo.git.clean("-fd")
             self.repo.git.stash("apply", f"stash@{{{index}}}")
             return True
         except ANY_GIT_ERROR as err:
