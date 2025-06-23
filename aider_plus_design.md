@@ -700,7 +700,7 @@ This section provides a granular, step-by-step implementation plan for building 
 
 **Goal:** Build the core components for tracking workflow state and enabling rollbacks.
 
-**Step 1: Define the `WorkflowState` data structure.**
+**Step 1: Define the `WorkflowState` data structure. (DONE)**
 *   **Action:** Create a new file `aider/plus/state.py`. In this file, define two `dataclasses`:
     1.  `Task`: Represents a single unit of work. It should include fields like `id` (UUID), `name` (string), `status` (Enum: 'pending', 'in_progress', 'completed', 'failed'), `dependencies` (list of task IDs), `agent` (string, e.g., 'planner', 'executor'), `result` (string, optional), and `history` (list of action strings).
     2.  `WorkflowState`: Represents the entire project plan. It should contain a `goal` (string) and a list of `Task` objects.
