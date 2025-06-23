@@ -1,4 +1,5 @@
 import json
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
 from aider.plus.state import TaskStatus, WorkflowState
@@ -64,100 +65,121 @@ class AiderPlusPM:
             return False
         return self.repo.restore_task_stash(task.id)
 
+    def _execute_task(self, task):
+        from aider.coders import Coder
+
+        self.create_checkpoint(task)
+
+        if self.test_cmd:
+            # TDD Cycle
+            # 1. Write a failing test
+            test_coder = Coder.create(
+                main_model=self.team.get_test_writer(),
+                io=self.io,
+                repo=self.repo,
+            )
+            test_coder.run(with_message=f"Write a failing test for: {task.name}")
+
+            # 2. Run the test, expect failure
+            exit_code, _ = run_cmd(self.test_cmd)
+            if exit_code == 0:
+                if self.io:
+                    self.io.tool_warning(
+                        f"Tests passed for `{task.name}` before implementation. Skipping"
+                        " implementation."
+                    )
+                return TaskStatus.COMPLETED
+
+            # 3. Implement the feature
+            impl_coder = Coder.create(
+                main_model=self.team.get_coder(),
+                io=self.io,
+                repo=self.repo,
+            )
+            impl_coder.run(
+                with_message=f"Implement the feature for: {task.name} to make the test pass."
+            )
+
+            # 4. Run the test, expect success
+            exit_code, _ = run_cmd(self.test_cmd)
+            if exit_code != 0:
+                if self.io:
+                    self.io.tool_error(f"Tests failed for `{task.name}` after implementation.")
+                return TaskStatus.FAILED
+
+            # 5. Critique and self-correction loop
+            while True:
+                reviewer = Coder.create(
+                    main_model=self.team.get_reviewer(), io=self.io, repo=self.repo
+                )
+                reviewer.run(with_message=f"Critique the implementation for: {task.name}")
+                critique = reviewer.partial_response_content.strip()
+
+                if not critique:
+                    break
+
+                fixer = Coder.create(main_model=self.team.get_coder(), io=self.io, repo=self.repo)
+                fixer.run(with_message=critique)
+
+                exit_code, _ = run_cmd(self.test_cmd)
+                if exit_code != 0:
+                    if self.io:
+                        self.io.tool_error(
+                            f"Tests failed for `{task.name}` after applying critique."
+                        )
+                    return TaskStatus.FAILED
+        else:
+            # Standard execution without TDD
+            coder = Coder.create(
+                main_model=self.team.get_coder(),
+                io=self.io,
+                repo=self.repo,
+            )
+            coder.run(with_message=task.name)
+
+        return TaskStatus.COMPLETED
+
     def execute_plan(self):
         """
         Executes the plan stored in the WorkflowState.
         """
-        from aider.coders import Coder
+        completed_tasks = {
+            task.id for task in self.state.tasks if task.status == TaskStatus.COMPLETED
+        }
+        in_progress_tasks = set()
 
-        for task in self.state.tasks:
-            if task.status == TaskStatus.PENDING:
-                self.create_checkpoint(task)
+        with ThreadPoolExecutor() as executor:
+            while len(completed_tasks) < len(self.state.tasks):
+                runnable_tasks = [
+                    task
+                    for task in self.state.tasks
+                    if task.status == TaskStatus.PENDING
+                    and task.id not in in_progress_tasks
+                    and all(dep in completed_tasks for dep in task.dependencies)
+                ]
 
-                if self.test_cmd:
-                    # TDD Cycle
-                    # 1. Write a failing test
-                    test_coder = Coder.create(
-                        main_model=self.team.get_test_writer(),
-                        io=self.io,
-                        repo=self.repo,
-                    )
-                    test_coder.run(with_message=f"Write a failing test for: {task.name}")
+                if not runnable_tasks and not in_progress_tasks:
+                    # No runnable tasks and no tasks in progress, so we're done or stuck
+                    break
 
-                    # 2. Run the test, expect failure
-                    exit_code, _ = run_cmd(self.test_cmd)
-                    if exit_code == 0:
+                futures = {
+                    executor.submit(self._execute_task, task): task for task in runnable_tasks
+                }
+                for task in runnable_tasks:
+                    task.status = TaskStatus.IN_PROGRESS
+                    in_progress_tasks.add(task.id)
+
+                for future in as_completed(futures):
+                    task = futures[future]
+                    try:
+                        result_status = future.result()
+                        task.status = result_status
+                        if result_status == TaskStatus.COMPLETED:
+                            completed_tasks.add(task.id)
+                    except Exception as e:
                         if self.io:
-                            self.io.tool_warning(
-                                f"Tests passed for `{task.name}` before implementation. Skipping"
-                                " implementation."
-                            )
-                        task.status = TaskStatus.COMPLETED
-                        self.save_state()
-                        continue
-
-                    # 3. Implement the feature
-                    impl_coder = Coder.create(
-                        main_model=self.team.get_coder(),
-                        io=self.io,
-                        repo=self.repo,
-                    )
-                    impl_coder.run(
-                        with_message=(
-                            f"Implement the feature for: {task.name} to make the test pass."
-                        )
-                    )
-
-                    # 4. Run the test, expect success
-                    exit_code, _ = run_cmd(self.test_cmd)
-                    if exit_code != 0:
-                        if self.io:
-                            self.io.tool_error(
-                                f"Tests failed for `{task.name}` after implementation."
-                            )
+                            self.io.tool_error(f"Error executing task {task.name}: {e}")
                         task.status = TaskStatus.FAILED
+                    finally:
+                        in_progress_tasks.remove(task.id)
                         self.save_state()
-                        continue
-
-                    # 5. Critique and self-correction loop
-                    while True:
-                        reviewer = Coder.create(
-                            main_model=self.team.get_reviewer(), io=self.io, repo=self.repo
-                        )
-                        reviewer.run(
-                            with_message=f"Critique the implementation for: {task.name}"
-                        )
-                        critique = reviewer.partial_response_content.strip()
-
-                        if not critique:
-                            # No feedback, task is complete
-                            break
-
-                        # We have feedback, so we need to fix it.
-                        fixer = Coder.create(
-                            main_model=self.team.get_coder(), io=self.io, repo=self.repo
-                        )
-                        fixer.run(with_message=critique)
-
-                        # Re-run tests after fix
-                        exit_code, _ = run_cmd(self.test_cmd)
-                        if exit_code != 0:
-                            if self.io:
-                                self.io.tool_error(
-                                    f"Tests failed for `{task.name}` after applying critique."
-                                )
-                            task.status = TaskStatus.FAILED
-                            self.save_state()
-                            break  # Exit critique loop on test failure after fix
-                else:
-                    # Standard execution without TDD
-                    coder = Coder.create(
-                        main_model=self.team.get_coder(),
-                        io=self.io,
-                        repo=self.repo,
-                    )
-                    coder.run(with_message=task.name)
-
-                if task.status != TaskStatus.FAILED:
-                    task.status = TaskStatus.COMPLETED
-                self.save_state()
