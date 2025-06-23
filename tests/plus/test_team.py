@@ -6,7 +6,7 @@ from aider.plus.team import AIEngineeringTeam
 
 
 class TestTeam(unittest.TestCase):
-    @patch("aider.models.Model")
+    @patch("aider.plus.team.Model")
     def test_team_initialization_and_roles(self, MockModel):
         # Mock Model instances
         mock_main_model = MagicMock()
@@ -25,7 +25,7 @@ class TestTeam(unittest.TestCase):
 
         MockModel.side_effect = model_side_effect
 
-        main_model_instance = Model("main-model")
+        main_model_instance = MockModel("main-model")
 
         team_config = {
             "coder": "coder-model",
