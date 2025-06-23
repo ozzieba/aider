@@ -124,10 +124,11 @@ class GitRepo:
 
         # https://github.com/gitpython-developers/GitPython/issues/427
         # odbt=git.GitDB is a workaround for gitpython bug < 3.1.10
+        repo_path = repo_paths.pop()
         try:
-            self.repo = git.Repo(repo_paths.pop())
+            self.repo = git.Repo(repo_path, odbt=git.GitDB)
         except AssertionError:
-            self.repo = git.Repo(repo_paths.pop(), odbt=git.GitDB)
+            self.repo = git.Repo(repo_path)
         self.root = utils.safe_abs_path(self.repo.working_tree_dir)
 
         if aider_ignore_file:
@@ -657,7 +658,7 @@ class GitRepo:
     def create_task_stash(self, task_id, message):
         """Creates a stash with a structured message for a given task."""
         try:
-            stash_message = f"aider-plus-task:{task_id} {message}"
+            stash_message = f"aider-plus-task:{task_id}:{message}"
             self.repo.git.stash("push", "-u", "-m", stash_message)
             return True
         except ANY_GIT_ERROR as err:

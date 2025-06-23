@@ -754,8 +754,8 @@ class TestRepo(unittest.TestCase):
 
             # Drop the stash
             self.assertTrue(git_repo.drop_task_stash("task1"))
-            stashes = repo.git.stash("list")
-            self.assertEqual(len(stashes.splitlines()), 0)
+            stashes = repo.stash
+            self.assertEqual(len(stashes), 0)
 
             # Test trying to restore/drop a non-existent stash
             self.assertFalse(git_repo.restore_task_stash("task-nonexistent"))
