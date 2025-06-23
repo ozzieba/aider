@@ -2,13 +2,14 @@ import json
 from pathlib import Path
 
 from aider.plus.state import TaskStatus, WorkflowState
+from aider.plus.team import AIEngineeringTeam
 from aider.run_cmd import run_cmd
 
 
 class AiderPlusPM:
-    def __init__(self, repo=None, root=".", main_model=None, io=None, test_cmd=None):
+    def __init__(self, repo=None, root=".", main_model=None, io=None, test_cmd=None, team_config=None):
         self.repo = repo
-        self.main_model = main_model
+        self.team = AIEngineeringTeam(main_model, team_config=team_config)
         self.io = io
         self.test_cmd = test_cmd
         if self.repo:
@@ -77,7 +78,7 @@ class AiderPlusPM:
                     # TDD Cycle
                     # 1. Write a failing test
                     test_coder = Coder.create(
-                        main_model=self.main_model,
+                        main_model=self.team.get_test_writer(),
                         io=self.io,
                         repo=self.repo,
                     )
@@ -97,7 +98,7 @@ class AiderPlusPM:
 
                     # 3. Implement the feature
                     impl_coder = Coder.create(
-                        main_model=self.main_model,
+                        main_model=self.team.get_coder(),
                         io=self.io,
                         repo=self.repo,
                     )
@@ -121,7 +122,7 @@ class AiderPlusPM:
                     # 5. Critique and self-correction loop
                     while True:
                         reviewer = Coder.create(
-                            main_model=self.main_model, io=self.io, repo=self.repo
+                            main_model=self.team.get_reviewer(), io=self.io, repo=self.repo
                         )
                         reviewer.run(
                             with_message=f"Critique the implementation for: {task.name}"
@@ -134,7 +135,7 @@ class AiderPlusPM:
 
                         # We have feedback, so we need to fix it.
                         fixer = Coder.create(
-                            main_model=self.main_model, io=self.io, repo=self.repo
+                            main_model=self.team.get_coder(), io=self.io, repo=self.repo
                         )
                         fixer.run(with_message=critique)
 
@@ -151,7 +152,7 @@ class AiderPlusPM:
                 else:
                     # Standard execution without TDD
                     coder = Coder.create(
-                        main_model=self.main_model,
+                        main_model=self.team.get_coder(),
                         io=self.io,
                         repo=self.repo,
                     )

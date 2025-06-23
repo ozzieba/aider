@@ -112,20 +112,30 @@ class TestPM(unittest.TestCase):
         res = pm.revert_to_checkpoint(task)
         self.assertFalse(res)
 
-    @patch("aider.coders.Coder")
-    def test_execute_plan(self, MockCoder):
+    @patch("aider.plus.pm.AIEngineeringTeam")
+    @patch("aider.coders.Coder.create")
+    def test_execute_plan(self, MockCoderCreate, MockTeam):
         with GitTemporaryDirectory() as repo_dir:
             repo_dir = Path(repo_dir)
             test_file = repo_dir / "test_file.py"
             test_file.write_text("def hello():\n    print('Hello, world!')\n")
 
+            # Setup mock team and models
+            mock_team_instance = MockTeam.return_value
+            mock_coder_model = MagicMock()
+            mock_team_instance.get_coder.return_value = mock_coder_model
+
             pm = AiderPlusPM(
-                repo=MagicMock(), root=repo_dir, main_model=MagicMock(), io=MagicMock()
+                repo=MagicMock(),
+                root=repo_dir,
+                main_model=MagicMock(),
+                io=MagicMock(),
+                team_config={},
             )
             task = Task(name="Refactor hello function")
             pm.state.tasks = [task]
 
-            mock_coder_instance = MockCoder.create.return_value
+            mock_coder_instance = MockCoderCreate.return_value
             mock_coder_instance.run.return_value = None
 
             pm.create_checkpoint = MagicMock(return_value=True)
@@ -138,24 +148,25 @@ class TestPM(unittest.TestCase):
             self.assertEqual(task.status, TaskStatus.COMPLETED)
             pm.save_state.assert_called()
 
+            # Verify the correct model from the team was used
+            MockCoderCreate.assert_called_once()
+            self.assertEqual(MockCoderCreate.call_args.kwargs["main_model"], mock_coder_model)
+
+    @patch("aider.plus.pm.AIEngineeringTeam")
     @patch("aider.coders.Coder.create")
     @patch("aider.plus.pm.run_cmd")
-    def test_execute_plan_with_tdd_and_critique(self, mock_run_cmd, MockCoderCreate):
+    def test_execute_plan_with_tdd_and_critique(self, mock_run_cmd, MockCoderCreate, MockTeam):
         with GitTemporaryDirectory() as repo_dir:
             repo_dir = Path(repo_dir)
 
             # Mocks for Coder instances
             mock_coder_test = MagicMock()
             mock_coder_impl = MagicMock()
-
             mock_coder_reviewer1 = MagicMock()
             mock_coder_reviewer1.partial_response_content = "This can be improved."
-
             mock_coder_fixer = MagicMock()
-
             mock_coder_reviewer2 = MagicMock()
             mock_coder_reviewer2.partial_response_content = ""
-
             MockCoderCreate.side_effect = [
                 mock_coder_test,
                 mock_coder_impl,
@@ -163,6 +174,15 @@ class TestPM(unittest.TestCase):
                 mock_coder_fixer,
                 mock_coder_reviewer2,
             ]
+
+            # Setup mock team and models
+            mock_team_instance = MockTeam.return_value
+            mock_test_writer_model = MagicMock(name="test_writer_model")
+            mock_coder_model = MagicMock(name="coder_model")
+            mock_reviewer_model = MagicMock(name="reviewer_model")
+            mock_team_instance.get_test_writer.return_value = mock_test_writer_model
+            mock_team_instance.get_coder.return_value = mock_coder_model
+            mock_team_instance.get_reviewer.return_value = mock_reviewer_model
 
             # Mock for run_cmd: fail first, then succeed, then succeed again after fix
             mock_run_cmd.side_effect = [
@@ -177,6 +197,7 @@ class TestPM(unittest.TestCase):
                 main_model=MagicMock(),
                 io=MagicMock(),
                 test_cmd="pytest",
+                team_config={},
             )
             task = Task(name="Refactor hello function")
             pm.state.tasks = [task]
@@ -188,6 +209,12 @@ class TestPM(unittest.TestCase):
 
             # Verify Coder creation
             self.assertEqual(MockCoderCreate.call_count, 5)
+            create_calls = MockCoderCreate.call_args_list
+            self.assertEqual(create_calls[0].kwargs["main_model"], mock_test_writer_model)
+            self.assertEqual(create_calls[1].kwargs["main_model"], mock_coder_model)
+            self.assertEqual(create_calls[2].kwargs["main_model"], mock_reviewer_model)
+            self.assertEqual(create_calls[3].kwargs["main_model"], mock_coder_model)
+            self.assertEqual(create_calls[4].kwargs["main_model"], mock_reviewer_model)
 
             # Verify test coder was run
             mock_coder_test.run.assert_called_once_with(
@@ -222,9 +249,10 @@ class TestPM(unittest.TestCase):
             self.assertEqual(task.status, TaskStatus.COMPLETED)
             pm.save_state.assert_called()
 
+    @patch("aider.plus.pm.AIEngineeringTeam")
     @patch("aider.coders.Coder.create")
     @patch("aider.plus.pm.run_cmd")
-    def test_execute_plan_with_tdd(self, mock_run_cmd, MockCoderCreate):
+    def test_execute_plan_with_tdd(self, mock_run_cmd, MockCoderCreate, MockTeam):
         with GitTemporaryDirectory() as repo_dir:
             repo_dir = Path(repo_dir)
 
@@ -235,6 +263,15 @@ class TestPM(unittest.TestCase):
             mock_reviewer.partial_response_content = ""  # No critique
             MockCoderCreate.side_effect = [mock_coder_test, mock_coder_impl, mock_reviewer]
 
+            # Setup mock team and models
+            mock_team_instance = MockTeam.return_value
+            mock_test_writer_model = MagicMock(name="test_writer_model")
+            mock_coder_model = MagicMock(name="coder_model")
+            mock_reviewer_model = MagicMock(name="reviewer_model")
+            mock_team_instance.get_test_writer.return_value = mock_test_writer_model
+            mock_team_instance.get_coder.return_value = mock_coder_model
+            mock_team_instance.get_reviewer.return_value = mock_reviewer_model
+
             # Mock for run_cmd: fail first, then succeed
             mock_run_cmd.side_effect = [(1, "tests failed"), (0, "tests passed")]
 
@@ -244,6 +281,7 @@ class TestPM(unittest.TestCase):
                 main_model=MagicMock(),
                 io=MagicMock(),
                 test_cmd="pytest",
+                team_config={},
             )
             task = Task(name="Refactor hello function")
             pm.state.tasks = [task]
@@ -255,6 +293,10 @@ class TestPM(unittest.TestCase):
 
             # Verify Coder creation
             self.assertEqual(MockCoderCreate.call_count, 3)
+            create_calls = MockCoderCreate.call_args_list
+            self.assertEqual(create_calls[0].kwargs["main_model"], mock_test_writer_model)
+            self.assertEqual(create_calls[1].kwargs["main_model"], mock_coder_model)
+            self.assertEqual(create_calls[2].kwargs["main_model"], mock_reviewer_model)
 
             # Verify test coder was run
             mock_coder_test.run.assert_called_once_with(
