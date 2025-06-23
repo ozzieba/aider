@@ -27,6 +27,7 @@ User experience is enhanced through interactive plan refinement, a rich status d
 - [13. Runtime Architecture & Deployment Strategies](#13-runtime-architecture--deployment-strategies)
 - [14. FAQ](#14-faq)
 - [15. Repository and Codebase Strategy: Monorepo Approach](#15-repository-and-codebase-strategy-monorepo-approach)
+- [16. Detailed Implementation Plan](#16-detailed-implementation-plan)
 - [Glossary](#glossary)
 
 </details>
@@ -691,12 +692,63 @@ graph TD
 
 This structure provides the best of both worlds: it leverages the strength and stability of the existing Aider codebase while providing a dedicated, decoupled space for the new, more complex Aider+ functionality to evolve.
 
+## 16. Detailed Implementation Plan
+
+This section provides a granular, step-by-step implementation plan for building Aider+, designed to be executed by a junior engineer. It is based on the incremental adoption strategy outlined in this document.
+
+### Phase 0.5: Foundational State Management & Recovery
+
+**Goal:** Build the core components for tracking workflow state and enabling rollbacks.
+
+**Step 1: Define the `WorkflowState` data structure.**
+*   **Action:** Create a new file `aider/plus/state.py`. In this file, define two `dataclasses`:
+    1.  `Task`: Represents a single unit of work. It should include fields like `id` (UUID), `name` (string), `status` (Enum: 'pending', 'in_progress', 'completed', 'failed'), `dependencies` (list of task IDs), `agent` (string, e.g., 'planner', 'executor'), `result` (string, optional), and `history` (list of action strings).
+    2.  `WorkflowState`: Represents the entire project plan. It should contain a `goal` (string) and a list of `Task` objects.
+*   **Tests:** Create `tests/plus/test_state.py`. Add unit tests to verify that `Task` and `WorkflowState` dataclasses can be instantiated correctly. Add tests for serialization to and from a dictionary to ensure JSON compatibility.
+
+**Step 2: Implement saving and loading of `WorkflowState`.**
+*   **Action:** Create a new file `aider/plus/pm.py` containing a placeholder `AiderPlusPM` class. Add `save_state()` and `load_state()` methods to this class. These methods will be responsible for serializing the `WorkflowState` to `.aider/workflow.json` and deserializing it back into memory.
+*   **Tests:** Create `tests/plus/test_pm.py`. Add tests for `save_state` and `load_state`. Use `pathlib.Path.read_text` and `write_text` with mocks to check that the methods write and read the correct JSON data. Test the edge case where `load_state` is called but `.aider/workflow.json` does not exist (it should create a new default state).
+
+**Step 3: Implement git-based checkpoints for tasks.**
+*   **Action:** In `aider/repo.py`, enhance the `GitRepo` class with methods for managing `git stash`:
+    1.  `create_task_stash(task_id: str, message: str) -> bool`: Creates a stash with a structured message like `aider-plus-task:<task_id>:<message>`.
+    2.  `restore_task_stash(task_id: str) -> bool`: Finds and applies the latest stash for a given `task_id`.
+    3.  `drop_task_stash(task_id: str) -> bool`: Finds and drops the latest stash for a `task_id`.
+*   **Action:** In `AiderPlusPM`, add methods `create_checkpoint(task)` and `revert_to_checkpoint(task)` that utilize the new `GitRepo` methods.
+*   **Tests:** In `tests/basic/test_repo.py`, add unit tests for the new `GitRepo` stash methods. The tests should create a repository, make file changes, create a stash for a task, make more changes, and then restore the stash to verify the repository state is correctly reverted. In `tests/plus/test_pm.py`, add tests for the `AiderPlusPM` checkpoint methods, mocking the `GitRepo` dependency.
+
+### Phase 1: The Structured Co-pilot
+
+**Goal:** Implement the core agentic loop where Aider+ can take a goal, create a plan, and execute it sequentially with a single agent.
+
+**Step 4: Implement the `/plan` command and high-level planning.**
+*   **Action:** In `aider/commands.py`, add a `cmd_plan(self, args)` method. This command will instantiate `AiderPlusPM`, which will then use an LLM to break down the user's goal (from `args`) into a multi-step plan. This plan will be stored in a `WorkflowState` object. The plan should be presented to the user for approval via `io.confirm_ask`.
+*   **Tests:** In `tests/basic/test_commands.py`, add a test for `cmd_plan`. Mock `AiderPlusPM` and the LLM call. Verify that the command correctly parses the user's goal, passes it to the PM, and that the mocked plan is displayed to the user for confirmation.
+
+**Step 5: Implement sequential task execution.**
+*   **Action:** In `AiderPlusPM`, implement an `execute_plan()` method. This method should loop through the tasks in `WorkflowState` in order. For each task, it will:
+    1.  Create a git checkpoint using the method from Step 3.
+    2.  Formulate a prompt for an 'executor' agent.
+    3.  Send the prompt to the LLM and get back code changes.
+    4.  Apply the changes to the files.
+    5.  Update the task's status to 'completed' and save the `WorkflowState`.
+*   **Tests:** In `tests/plus/test_pm.py`, create a new test for `execute_plan`. Mock the LLM call to return a specific code change in edit block format. Provide a simple `WorkflowState` with one task. Verify that the target file is modified correctly and that the task's status is updated to 'completed' in `workflow.json`.
+
+**Step 6: Integrate a TDD cycle and self-critique loop.**
+*   **Action:** Refactor `execute_plan()` to incorporate a TDD and self-critique workflow. When a task is for implementation, the PM should dynamically inject new sub-tasks into the plan:
+    1.  **"Write a failing test for [feature]"**: Execute this task first. After it's done, run the specified `test_cmd`. The test should fail.
+    2.  **"Implement [feature]"**: Execute this task. After, run `test_cmd` again. The test should now pass.
+    3.  **"Critique the implementation of [feature]"**: Send the new code and tests to a 'reviewer' agent. If the reviewer provides feedback, generate a new implementation sub-task and loop. If the reviewer approves, the main task is complete.
+*   **Tests:** In `tests/plus/test_pm.py`, add a test that mocks this TDD process. Mock the LLM to return a new test file, then mock `run_cmd` to return a failure. Mock the LLM again to return implementation code, then mock `run_cmd` to return success. Mock the LLM a final time to return a critique. Verify that the sequence of mocks is called in the correct order.
+
 ## Glossary
 
 | Term | Definition |
 |------|------------|
 | Senior Engineer / Architect | The human user who provides high-level direction and final approval. |
-| Aider+ PM | The autonomous orchestration layer that manages tasks, agents, and workflow state. |
+| Aider+ PM | The autonomous orchestration layer that manages tasks, agents, and workflow state. See `AiderPlusPM`. |
+| AiderPlusPM | The main class that implements the Aider+ PM. It manages the project plan, state, and task assignments. |
 | LLM / Agent / Engineer | A language-model-powered worker specializing in a role such as coder, tester, reviewer, etc. |
 | MCP (Model Context Protocol) | The mechanism Aider+ uses to fetch external context—code, docs, web content—for agents. |
 | Task | A single actionable unit of work in the workflow (e.g., “write a failing test for login”). |
