@@ -46,25 +46,35 @@ The primary goal of Aider+ is to **maximize the autonomous productivity of the A
 
 This section provides a brief overview of how a user would interact with the Aider+ system.
 
-1.  **Initiate a High-Level Goal:** The user starts by giving Aider+ a high-level objective using the `/plan` command.
+1.  **Initiate a High-Level Goal:** The user starts with a concise, high-level objective.
     ```bash
     /plan Implement OAuth 2.0 login with Google
     ```
-2.  **Review and Refine the Plan:** Aider+ analyzes the goal and presents a multi-step implementation plan. The user can approve it, request changes, or interactively refine it.
+2.  **Collaborate on an AI-Generated Design:** Instead of asking the user for a detailed plan, Aider+ takes the initiative. A specialized `planner` agent analyzes the codebase and proposes an opinionated, detailed design document. This turns a generic prompt into a concrete proposal for the user to react to.
     ```
-    PM: Here's my plan for implementing OAuth:
-    1. Add dependencies ⚠️ [Suggestion: also add refresh token support]
-    2. Create auth middleware
-    3. Add login endpoint ⚠️ [Missing: logout endpoint]
-    4. Write tests
+    PM: I've drafted a design for Google OAuth 2.0. Key decisions:
+    - We'll use the `omniauth-google-oauth2` gem for authentication.
+    - A new `OmniauthCallbacksController` will handle the callback logic.
+    - We'll add `uid`, `provider`, and `refresh_token` columns to the `User` model to store credentials.
+    Please review the full design in `docs/designs/oauth_google.md` and provide feedback.
 
-    Your action? [/approve | /refine | /modify]
+    You: /request_changes "Good start, but let's make sure the refresh_token is encrypted in the database."
     ```
-3.  **Monitor Autonomous Execution:** Once approved, Aider+ manages the AI engineering team to execute the plan. The user can monitor progress via a rich status dashboard showing a Gantt chart of tasks, agent utilization, and cost burn rate.
+3.  **Approve the Final Plan:** Once the design is refined and approved, Aider+ generates a concrete, step-by-step implementation plan for the user's final approval.
+    ```
+    PM: Design updated to include database-level encryption for the refresh token. Here's the execution plan:
+    1. Add `omniauth-google-oauth2` and `attr_encrypted` to Gemfile.
+    2. Create migration to add encrypted `refresh_token` to users table.
+    3. Implement `OmniauthCallbacksController`.
+    4. Write tests for the controller, including token encryption.
+
+    Your action? [/approve | /modify]
+    ```
+4.  **Monitor Autonomous Execution:** Once approved, Aider+ manages the AI engineering team to execute the plan. The user can monitor progress via a rich status dashboard.
     ```bash
     /status
     ```
-4.  **Provide Feedback and Final Approval:** Aider+ presents completed work, having already passed an internal multi-stage review pipeline (linting, tests, security scans). The user gives the final approval for the commit.
+5.  **Provide Feedback and Final Approval:** Aider+ presents completed work, having already passed its internal multi-stage review pipeline. The user gives the final approval.
     ```bash
     /approve
     ```
@@ -102,7 +112,7 @@ This is the core of Aider+. It's the system the PM uses to plan, execute, and mo
 The PM follows a structured, predictable playbook for all development tasks, ensuring consistency and quality. This workflow is inspired by the successful patterns observed in the session transcripts.
 
 *   **Workflow Stages:**
-    1.  **Architect/Design:** The PM first directs an agent to create a design document for any non-trivial task.
+    1.  **Architect/Design:** The user starts with a simple, high-level goal. The PM then takes the initiative by directing an agent to analyze the request and the existing codebase to produce an opinionated, detailed design document. This transforms a generic prompt into a concrete proposal that the Senior Engineer can efficiently review and refine.
     2.  **Expand/Plan:** Once the design is approved by the Senior Engineer, the PM breaks it into a detailed, step-by-step implementation plan with clear tasks.
     3.  **Implement (TDD Cycle):** The PM assigns tasks to the appropriate engineers, enforcing a TDD cycle:
         a.  An engineer writes a failing test.
