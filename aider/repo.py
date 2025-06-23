@@ -1,5 +1,6 @@
 import contextlib
 import os
+import re
 import time
 from pathlib import Path, PurePosixPath
 
@@ -624,9 +625,34 @@ class GitRepo:
 
     def _find_stash_for_task(self, task_id):
         prefix = f"aider-plus-task:{task_id}:"
-        for i, stash in enumerate(self.repo.stash):
-            if stash.message.startswith(prefix):
-                return i, stash
+        try:
+            # The format gives lines like: stash@{0}:aider-plus-task:task_id:message
+            stashes_str = self.repo.git.stash("list", "--format=%gd:%gs")
+        except git.exc.GitCommandError:
+            return None, None
+
+        if not stashes_str:
+            return None, None
+
+        for line in stashes_str.splitlines():
+            if not line.strip():
+                continue
+
+            parts = line.split(":", 1)
+            if len(parts) != 2:
+                continue
+
+            ref, message = parts
+            if message.startswith(prefix):
+                match = re.match(r"stash@\{(\d+)\}", ref)
+                if match:
+                    index = int(match.group(1))
+
+                    class MockStash:
+                        def __init__(self, msg):
+                            self.message = msg
+
+                    return index, MockStash(message)
         return None, None
 
     def create_task_stash(self, task_id, message):

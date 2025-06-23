@@ -21,7 +21,7 @@ class TestRepo(unittest.TestCase):
 
     def test_diffs_empty_repo(self):
         with GitTemporaryDirectory():
-            repo = git.Repo()
+            repo = git.Repo(odbt=git.GitDB)
 
             # Add a change to the index
             fname = Path("foo.txt")
