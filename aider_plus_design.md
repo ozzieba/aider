@@ -710,7 +710,7 @@ This section provides a granular, step-by-step implementation plan for building 
 *   **Action:** Create a new file `aider/plus/pm.py` containing a placeholder `AiderPlusPM` class. Add `save_state()` and `load_state()` methods to this class. These methods will be responsible for serializing the `WorkflowState` to `.aider/workflow.json` and deserializing it back into memory.
 *   **Tests:** Create `tests/plus/test_pm.py`. Add tests for `save_state` and `load_state`. Use `pathlib.Path.read_text` and `write_text` with mocks to check that the methods write and read the correct JSON data. Test the edge case where `load_state` is called but `.aider/workflow.json` does not exist (it should create a new default state).
 
-**Step 3: Implement git-based checkpoints for tasks.**
+**Step 3: Implement git-based checkpoints for tasks. (DONE)**
 *   **Action:** In `aider/repo.py`, enhance the `GitRepo` class with methods for managing `git stash`:
     1.  `create_task_stash(task_id: str, message: str) -> bool`: Creates a stash with a structured message like `aider-plus-task:<task_id>:<message>`.
     2.  `restore_task_stash(task_id: str) -> bool`: Finds and applies the latest stash for a given `task_id`.

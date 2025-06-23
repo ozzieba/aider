@@ -1,6 +1,7 @@
 import json
 import unittest
 from pathlib import Path
+from unittest.mock import MagicMock
 
 from aider.plus.pm import AiderPlusPM
 from aider.plus.state import Task, WorkflowState
@@ -80,3 +81,33 @@ class TestPM(unittest.TestCase):
 
         pm = AiderPlusPM(root=self.tempdir)
         self.assertEqual(pm.state.goal, "Initial Goal")
+
+    def test_checkpoints(self):
+        mock_repo = MagicMock()
+        mock_repo.create_task_stash.return_value = True
+        mock_repo.restore_task_stash.return_value = True
+
+        pm = AiderPlusPM(repo=mock_repo, root=self.tempdir)
+        task = Task(name="test task")
+
+        # Test create checkpoint
+        res = pm.create_checkpoint(task)
+        self.assertTrue(res)
+        mock_repo.create_task_stash.assert_called_once_with(task.id, task.name)
+
+        # Test revert to checkpoint
+        res = pm.revert_to_checkpoint(task)
+        self.assertTrue(res)
+        mock_repo.restore_task_stash.assert_called_once_with(task.id)
+
+    def test_checkpoints_no_repo(self):
+        pm = AiderPlusPM(repo=None, root=self.tempdir)
+        task = Task(name="test task")
+
+        # Test create checkpoint
+        res = pm.create_checkpoint(task)
+        self.assertFalse(res)
+
+        # Test revert to checkpoint
+        res = pm.revert_to_checkpoint(task)
+        self.assertFalse(res)

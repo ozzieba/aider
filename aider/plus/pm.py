@@ -5,8 +5,12 @@ from aider.plus.state import WorkflowState
 
 
 class AiderPlusPM:
-    def __init__(self, root="."):
-        self.root = Path(root)
+    def __init__(self, repo=None, root="."):
+        self.repo = repo
+        if self.repo:
+            self.root = Path(self.repo.root)
+        else:
+            self.root = Path(root)
         self.workflow_file = self.root / ".aider" / "workflow.json"
         self.state = self.load_state()
 
@@ -35,3 +39,15 @@ class AiderPlusPM:
         except (json.JSONDecodeError, FileNotFoundError, TypeError, KeyError):
             # If file is corrupted, malformed, or empty, start fresh
             return WorkflowState()
+
+    def create_checkpoint(self, task):
+        """Creates a git stash checkpoint for the given task."""
+        if not self.repo:
+            return False
+        return self.repo.create_task_stash(task.id, task.name)
+
+    def revert_to_checkpoint(self, task):
+        """Reverts the repo to the git stash checkpoint for the given task."""
+        if not self.repo:
+            return False
+        return self.repo.restore_task_stash(task.id)

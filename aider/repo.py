@@ -621,3 +621,45 @@ class GitRepo:
         if not commit:
             return default
         return commit.message
+
+    def _find_stash_for_task(self, task_id):
+        prefix = f"aider-plus-task:{task_id}:"
+        for i, stash in enumerate(self.repo.stash):
+            if stash.message.startswith(prefix):
+                return i, stash
+        return None, None
+
+    def create_task_stash(self, task_id, message):
+        """Creates a stash with a structured message for a given task."""
+        try:
+            stash_message = f"aider-plus-task:{task_id}:{message}"
+            self.repo.git.stash("push", "-u", "-m", stash_message)
+            return True
+        except ANY_GIT_ERROR as err:
+            self.io.tool_error(f"Unable to create stash for task {task_id}: {err}")
+            return False
+
+    def restore_task_stash(self, task_id):
+        """Finds and applies the latest stash for a given task_id."""
+        index, stash = self._find_stash_for_task(task_id)
+        if stash is None:
+            self.io.tool_warning(f"No stash found for task {task_id}.")
+            return False
+        try:
+            self.repo.git.stash("apply", f"stash@{{{index}}}")
+            return True
+        except ANY_GIT_ERROR as err:
+            self.io.tool_error(f"Unable to restore stash for task {task_id}: {err}")
+            return False
+
+    def drop_task_stash(self, task_id):
+        """Finds and drops the latest stash for a task_id."""
+        index, stash = self._find_stash_for_task(task_id)
+        if stash is None:
+            return False  # No stash to drop, not an error.
+        try:
+            self.repo.git.stash("drop", f"stash@{{{index}}}")
+            return True
+        except ANY_GIT_ERROR as err:
+            self.io.tool_error(f"Unable to drop stash for task {task_id}: {err}")
+            return False

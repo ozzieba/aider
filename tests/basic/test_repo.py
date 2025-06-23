@@ -714,3 +714,49 @@ class TestRepo(unittest.TestCase):
                 system_msg_content.startswith(prefix),
                 "system_prompt_prefix should be prepended to the system prompt",
             )
+
+    def test_task_stash(self):
+        with GitTemporaryDirectory():
+            repo = git.Repo()
+
+            # initial commit
+            fname1 = Path("file1.txt")
+            fname1.write_text("initial content")
+            repo.git.add(str(fname1))
+            repo.git.commit("-m", "initial commit")
+
+            git_repo = GitRepo(InputOutput(), None, ".")
+
+            # First change and stash
+            fname1.write_text("first change")
+            fname2 = Path("file2.txt")
+            fname2.write_text("untracked file")
+            self.assertTrue(git_repo.create_task_stash("task1", "first task"))
+
+            # Check repo is clean
+            self.assertFalse(repo.is_dirty())
+            self.assertEqual(fname1.read_text(), "initial content")
+            self.assertFalse(fname2.exists())
+
+            # Second change
+            fname1.write_text("second change")
+
+            # Restore stash
+            self.assertTrue(git_repo.restore_task_stash("task1"))
+
+            # Check that first change is restored
+            self.assertEqual(fname1.read_text(), "first change")
+            self.assertTrue(fname2.exists())
+            self.assertEqual(fname2.read_text(), "untracked file")
+
+            # Check that repo is dirty with second change on top
+            self.assertTrue(repo.is_dirty())
+
+            # Drop the stash
+            self.assertTrue(git_repo.drop_task_stash("task1"))
+            stashes = repo.stash
+            self.assertEqual(len(stashes), 0)
+
+            # Test trying to restore/drop a non-existent stash
+            self.assertFalse(git_repo.restore_task_stash("task-nonexistent"))
+            self.assertFalse(git_repo.drop_task_stash("task-nonexistent"))
