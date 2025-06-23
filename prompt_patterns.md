@@ -220,6 +220,22 @@ These prompts are for making specific, significant changes to the codebase. They
 
 > for the bates range report, use duckdb joins rather than pandas apply; generally, each row should represent a contiguous range of bates numbers where all the numbers are in the same set of production files (ie, between bates_begin and bates_ned for some row in the dat file); for each such consolidated range, show me bates_begin, bates_end, production files
 
+> if chunks_order is not in Elastic, let's compute it as simply the sequential chunk id order within this RecordDatum/referent
+
+> let's have the lance migrations do nothing if not K8S=1
+
+> in `BatchedCreateEmbeddingsJob`, let's get the chunk IDs from Elastic rather than PG
+
+> let's create a Sidekiq job that can run an arbitrary method of an arbitrary module with arbitrary args. Likewise something that can call an arbitrary method on an arbitrary ActiveRecord object, by class and id
+
+> let's implement the first of our stateless transformations, create_chunks; in particular, we want it to be a Ruby module that just wraps the stateless Python `SentenceChunker`  and `TableChunker`  methods; it should take a filename to read from and a filename to write to. it should read either text or a binary (xls, csv, etc), and write the chunks as an arrow table. Use PyCall. Don't implement retries, or anything else at this stage, just the stateless transformation between files.
+
+> let's add methods to Transformation::Base that allow chaining and error handling, like && and || in bash; these methods should take a sequence of transformations and create a composite transformation that follows the desired logic.
+
+> let's also implement sidekiq versions of and_then / or_else that use Sidekiq batch callbacks etc
+
+> let's define a way to retrieve error information from a failed transformation, including chained transformations
+
 ### 3. Debugging & Troubleshooting
 
 These are reactive prompts used when an error occurs. The user provides context about the failure (error messages, stack traces, symptoms) and asks for a fix.
@@ -355,6 +371,8 @@ These are reactive prompts used when an error occurs. The user provides context 
 > Should RD2.is_slip_sheeted? be returning true? Can we fix this test, or would more logging help?
 
 > hmm, something is doing substitution or something... Extracting with command: 7z x -so -p'h:T'(wb5l@.[KV/g+2-4'(wb5l@.[KV/g+2-4' ... Syntax error: "(" unexpected
+
+> let's handle nulls NoMethodError: undefined method `[]' for nil:NilClass (NoMethodError)
 
 ### 4. Code Analysis & Explanation
 
@@ -497,6 +515,18 @@ These prompts leverage the AI for code comprehension and analysis without reques
 > /ask how sure are you that you're not breaking the dev env?
 
 > can't we have `CreateLanceDbIndex` take a callback class/method/block and call it when the `BatchedCreateEmbeddingsJob`s are done?
+
+> /ask how can I create and run a bulk operation from rails console to remove a bunch of tags?
+
+> wait do we actually want the pipelines to have orchestration logic? Maybe they should call a default/configurable Orchestrator? Maybe they should have some minimla micro-orchestration? Obviously we may want to change the tests depending on the design
+
+> /ask please write a detailed review/critique of docs/produce_batch_refactoring_plan.md
+
+> I also think that Transformations::Base.call basically should be in Orchestrator...
+
+> /ask declarative pipeline sounds good, but ideally it would be directly reusable as a Pipeline object... How do we facilitate that? Can we eg make Pipeline.and_then build a new subclass of Pipeline?
+
+> I don't get it, what's the problem with just having slipsheet_if_needed return tge Conditional pipdline (without extra explicit classes)?
 
 ### 5. Iterative Refinement & Clarification
 
@@ -643,6 +673,28 @@ This category captures the conversational nature of the interactions. The user p
 > `+actually we always need \`EmbeddingsCallback\` with \`close_table\`, but then that should call whatever other callback (in particular to update the review batch progress, but also to can \`run_diagnostics\` for ingested batches`
 
 > `+let's pass the progress updater object with steps and completions as json`
+
+> that callback is only for review batches, `CreateLanceDbIndex` is alswo called in other contexts... let's have it take a class as a parameter
+
+> I think we need to update create_images.rb as well; and it might make sense to leave  Documentable#text_from_tokens as a thin wrapper on the relevant pipeline?
+
+> parallel transformations should support and_then / or_else
+
+> I think we should rename from_files to `from_attachments`, and allow more general specification of which AR models/attachments to use... but also that's not really a stateless transformation, let's properly separate the separate and stateless parts; stateful part can be a service but not a transformation
+
+> hmm, actually I think we should do Directory::FromFiles, but actually make it take just file paths; and then the Attachment provider can provide those
+
+> instead of DownloadFiles, let's use director.from_files; likewise for db metadata the transformations should generate abstract table fragments (eg arrow or sqlite); then have separate mechanisms for eg upserting to each data store (these are not transformations, since they're inherently dtateful). Likewise have a Zip::FromDirectory transformation. Vectorize more (perhaps Base should have something like transform_bulk?)
+
+> lets separate the stateful "transformations" into separate services for each datastore (PG, ES, Lance, possibly GCS) that eg can take an artifact and upsert/create/delete
+
+> can we make this more concise, eg using .and_then, and/or by introducting some option to the orchestrator to delete temp directories once we're done with them?
+
+> you'fe way overcomplicating; just def slipshest_if_needed `Conditional`() end
+
+> I have the following critique of `docs/produce_batch_refactoring_plan.md` ... Please address in the following ways...
+
+> /ask I _COMMAND_ you to give me an implementation with dynamic class generation and no |res,meta| boilerplate
 
 ### 6. Direct & Specific Instructions
 
@@ -799,6 +851,12 @@ This category includes prompts related to setting up the development, testing, a
 > does viewer include secretsAccessor?
 
 > what do we need to do to get rspec to exit with 0 if there are pending tests but no failing tests?
+
+> please give me a command to find all files that were updated from origin/main to origin/generate_thumbnails_transform (also checked out as worktree in ../api-transformations) and for all of those files find the diff between generate_thumbnails_transform and HEAD/transformations_productions
+
+> please give me a command to checkout out generate_thumbnails_transform and apply all these changes (but not all the unrelated changes from this branch)
+
+> we're trying to cherry-pick minimal changes from api-transformations_productions to the current branch (generate_thunbnails_transformation) to the current branch, though generally only addressing files where current branch is different from main, looks like we need to pull in Pipeline also, please provide commands for that. Also check if there's anything else we're likely to need
 
 ## General Observations & Best Practices
 
