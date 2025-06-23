@@ -7,6 +7,7 @@ import tempfile
 from io import StringIO
 from pathlib import Path
 from unittest import TestCase, mock
+from unittest.mock import MagicMock, patch
 
 import git
 import pyperclip
@@ -2197,3 +2198,45 @@ class TestCommands(TestCase):
             )
             self.assertEqual(new_coder.done_messages, [{"role": "user", "content": "d1"}])
             self.assertEqual(new_coder.cur_messages, [{"role": "user", "content": "c1"}])
+
+    @patch("aider.commands.AiderPlusPM")
+    def test_cmd_plan(self, mock_AiderPlusPM):
+        # Initialize the Commands and InputOutput objects
+        io = InputOutput(pretty=False, fancy_input=False, yes=False)
+        coder = Coder.create(self.GPT35, None, io, repo=MagicMock())
+        commands = Commands(io, coder)
+
+        # Mock the AiderPlusPM instance and its make_plan method
+        mock_pm_instance = mock_AiderPlusPM.return_value
+        mock_plan = MagicMock()
+        mock_plan.tasks = [MagicMock(name="Task 1"), MagicMock(name="Task 2")]
+        mock_pm_instance.make_plan.return_value = mock_plan
+
+        # Mock io.confirm_ask to simulate user approval
+        io.confirm_ask = MagicMock(return_value=True)
+        io.tool_output = MagicMock()
+
+        # Call the cmd_plan method
+        goal = "Implement a new feature"
+        commands.cmd_plan(goal)
+
+        # Verify AiderPlusPM was instantiated correctly
+        mock_AiderPlusPM.assert_called_once_with(
+            repo=coder.repo, main_model=coder.main_model, io=io
+        )
+
+        # Verify make_plan was called with the goal
+        mock_pm_instance.make_plan.assert_called_once_with(goal)
+
+        # Verify the plan was displayed to the user
+        io.tool_output.assert_any_call("Proposed plan:")
+        io.tool_output.assert_any_call("1. Task 1")
+        io.tool_output.assert_any_call("2. Task 2")
+
+        # Verify confirm_ask was called
+        io.confirm_ask.assert_called_once_with("Approve this plan?")
+
+        # Verify that state was saved on approval
+        mock_pm_instance.save_state.assert_called_once()
+        self.assertEqual(mock_pm_instance.state.goal, goal)
+        self.assertEqual(mock_pm_instance.state.tasks, mock_plan.tasks)

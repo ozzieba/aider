@@ -5,8 +5,10 @@ from aider.plus.state import WorkflowState
 
 
 class AiderPlusPM:
-    def __init__(self, repo=None, root="."):
+    def __init__(self, repo=None, root=".", main_model=None, io=None):
         self.repo = repo
+        self.main_model = main_model
+        self.io = io
         if self.repo:
             self.root = Path(self.repo.root)
         else:
