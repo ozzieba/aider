@@ -1,11 +1,11 @@
 import json
 import unittest
 from pathlib import Path
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 from aider.plus.pm import AiderPlusPM
-from aider.plus.state import Task, WorkflowState
-from aider.utils import IgnorantTemporaryDirectory
+from aider.plus.state import Task, TaskStatus, WorkflowState
+from aider.utils import GitTemporaryDirectory, IgnorantTemporaryDirectory
 
 
 class TestPM(unittest.TestCase):
@@ -111,3 +111,29 @@ class TestPM(unittest.TestCase):
         # Test revert to checkpoint
         res = pm.revert_to_checkpoint(task)
         self.assertFalse(res)
+
+    @patch("aider.plus.pm.Coder")
+    def test_execute_plan(self, MockCoder):
+        with GitTemporaryDirectory() as repo_dir:
+            repo_dir = Path(repo_dir)
+            test_file = repo_dir / "test_file.py"
+            test_file.write_text("def hello():\n    print('Hello, world!')\n")
+
+            pm = AiderPlusPM(
+                repo=MagicMock(), root=repo_dir, main_model=MagicMock(), io=MagicMock()
+            )
+            task = Task(name="Refactor hello function")
+            pm.state.tasks = [task]
+
+            mock_coder_instance = MockCoder.return_value
+            mock_coder_instance.run.return_value = None
+
+            pm.create_checkpoint = MagicMock(return_value=True)
+            pm.save_state = MagicMock()
+
+            pm.execute_plan()
+
+            pm.create_checkpoint.assert_called_once_with(task)
+            mock_coder_instance.run.assert_called_once()
+            self.assertEqual(task.status, TaskStatus.COMPLETED)
+            pm.save_state.assert_called()

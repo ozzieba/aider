@@ -2209,7 +2209,11 @@ class TestCommands(TestCase):
         # Mock the AiderPlusPM instance and its make_plan method
         mock_pm_instance = mock_AiderPlusPM.return_value
         mock_plan = MagicMock()
-        mock_plan.tasks = [MagicMock(name="Task 1"), MagicMock(name="Task 2")]
+        task1 = MagicMock()
+        task1.name = "Task 1"
+        task2 = MagicMock()
+        task2.name = "Task 2"
+        mock_plan.tasks = [task1, task2]
         mock_pm_instance.make_plan.return_value = mock_plan
 
         # Mock io.confirm_ask to simulate user approval

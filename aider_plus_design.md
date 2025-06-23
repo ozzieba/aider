@@ -722,11 +722,11 @@ This section provides a granular, step-by-step implementation plan for building 
 
 **Goal:** Implement the core agentic loop where Aider+ can take a goal, create a plan, and execute it sequentially with a single agent.
 
-**Step 4: Implement the `/plan` command and high-level planning. (IN PROGRESS)**
+**Step 4: Implement the `/plan` command and high-level planning. (DONE)**
 *   **Action:** In `aider/commands.py`, add a `cmd_plan(self, args)` method. This command will instantiate `AiderPlusPM`, which will then use an LLM to break down the user's goal (from `args`) into a multi-step plan. This plan will be stored in a `WorkflowState` object. The plan should be presented to the user for approval via `io.confirm_ask`.
 *   **Tests:** In `tests/basic/test_commands.py`, add a test for `cmd_plan`. Mock `AiderPlusPM` and the LLM call. Verify that the command correctly parses the user's goal, passes it to the PM, and that the mocked plan is displayed to the user for confirmation.
 
-**Step 5: Implement sequential task execution.**
+**Step 5: Implement sequential task execution. (IN PROGRESS)**
 *   **Action:** In `AiderPlusPM`, implement an `execute_plan()` method. This method should loop through the tasks in `WorkflowState` in order. For each task, it will:
     1.  Create a git checkpoint using the method from Step 3.
     2.  Formulate a prompt for an 'executor' agent.
