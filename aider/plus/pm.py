@@ -208,11 +208,16 @@ class AiderPlusPM:
                             if self.io:
                                 self.io.tool_error(f"Execution aborted during task {task.name}.")
                             task.status = TaskStatus.FAILED
-                            # This will cause the outer loop to break
-                            # because no new tasks will be runnable.
-                            # We need to explicitly cancel remaining futures.
+
                             for f in futures:
-                                f.cancel()
+                                if f != future:
+                                    f.cancel()
+
+                            for t in self.state.tasks:
+                                if t.id != task.id and t.status == TaskStatus.IN_PROGRESS:
+                                    t.status = TaskStatus.PENDING
+
+                            self.save_state()
                             return
                         except Exception as e:
                             if self.io:
