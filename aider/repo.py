@@ -629,7 +629,7 @@ class GitRepo:
         return commit.message
 
     def _find_stash_for_task(self, task_id):
-        prefix = f"aider-plus-task:{task_id} "
+        prefix = f"aider-plus-task:{task_id}:"
         try:
             # The format gives lines like: stash@{0}:aider-plus-task:task_id:message
             stashes_str = self.repo.git.stash("list", "--format=%gd:%gs")
