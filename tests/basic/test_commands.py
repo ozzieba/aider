@@ -2199,7 +2199,7 @@ class TestCommands(TestCase):
             self.assertEqual(new_coder.done_messages, [{"role": "user", "content": "d1"}])
             self.assertEqual(new_coder.cur_messages, [{"role": "user", "content": "c1"}])
 
-    @patch("aider.plus.pm.AiderPlusPM")
+    @patch("aider.commands.AiderPlusPM")
     def test_cmd_plan(self, mock_AiderPlusPM):
         # Initialize the Commands and InputOutput objects
         io = InputOutput(pretty=False, fancy_input=False, yes=False)
