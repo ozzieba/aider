@@ -58,7 +58,7 @@ class AiderPlusPM:
         from aider.coders import Coder
 
         designer = Coder.create(
-            main_model=self.team.get_coder(),  # Or a dedicated designer model
+            main_model=self.team.get_designer(),  # Or a dedicated designer model
             io=self.io,
             repo=self.repo,
         )
@@ -78,7 +78,7 @@ class AiderPlusPM:
         from aider.coders import Coder
 
         planner = Coder.create(
-            main_model=self.team.get_coder(),  # Or a dedicated planner model
+            main_model=self.team.get_planner(),  # Or a dedicated planner model
             io=self.io,
             repo=self.repo,
         )

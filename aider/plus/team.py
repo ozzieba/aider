@@ -18,3 +18,9 @@ class AIEngineeringTeam:
 
     def get_test_writer(self):
         return self.roles.get("test_writer") or self.main_model
+
+    def get_designer(self):
+        return self.roles.get("designer") or self.main_model
+
+    def get_planner(self):
+        return self.roles.get("planner") or self.main_model

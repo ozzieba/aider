@@ -20,6 +20,7 @@ from aider.help import Help, install_help_extra
 from aider.io import CommandCompletionException
 from aider.llm import litellm
 from aider.plus.pm import AiderPlusPM
+from aider.plus.state import WorkflowState
 from aider.repo import ANY_GIT_ERROR
 from aider.run_cmd import run_cmd
 from aider.scrape import Scraper, install_playwright
@@ -1553,22 +1554,61 @@ class Commands:
             main_model=self.coder.main_model,
             io=self.io,
             test_cmd=self.coder.test_cmd,
+            team_config=getattr(self.args, "team_config", None),
         )
-        plan = pm.make_plan(goal)
+
+        # Clear out any previous plan
+        if pm.state.tasks:
+            if self.io.confirm_ask(
+                "A plan is already in progress. Do you want to start a new one?"
+            ):
+                if self.coder.repo:
+                    self.coder.repo.drop_all_task_stashes()
+                pm.state = WorkflowState()
+                pm.save_state()
+            else:
+                self.io.tool_output("Aborting new plan.")
+                return
+
+        design_doc = pm.make_design(goal)
+        if not design_doc:
+            self.io.tool_error("Unable to create a design for the given goal.")
+            return
+
+        self.io.tool_output(
+            "An AI architect has proposed a design. Please review and edit it in your editor."
+        )
+        self.io.tool_output("Save and close the editor when you are done.")
+        self.io.tool_output()
+
+        if self.io.confirm_ask("Open design in editor to make changes?"):
+            design_doc = pipe_editor(design_doc, suffix=".md", editor=self.editor)
+
+        if not self.io.confirm_ask("Approve this design?"):
+            self.io.tool_output("Design rejected.")
+            return
+
+        self.io.tool_output("Design approved. Creating implementation plan...")
+
+        plan = pm.make_plan(goal, design_doc)
 
         if not plan or not plan.tasks:
-            self.io.tool_error("Unable to create a plan for the given goal.")
+            self.io.tool_error("Unable to create a plan from the design.")
             return
 
         self.io.tool_output("Proposed plan:")
         for i, task in enumerate(plan.tasks):
             self.io.tool_output(f"{i+1}. {task.name}")
 
-        if self.io.confirm_ask("Approve this plan?"):
+        if self.io.confirm_ask("Approve this plan to begin execution?"):
             pm.state.goal = goal
             pm.state.tasks = plan.tasks
             pm.save_state()
-            self.io.tool_output("Plan approved and saved.")
+            self.io.tool_output(
+                "Plan approved. Aider+ will now begin executing the plan.\nUse `/status` to"
+                " check progress."
+            )
+            pm.execute_plan()
         else:
             self.io.tool_output("Plan rejected.")
 

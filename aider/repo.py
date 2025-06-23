@@ -691,3 +691,43 @@ class GitRepo:
         except ANY_GIT_ERROR as err:
             self.io.tool_error(f"Unable to drop stash for task {task_id}: {err}")
             return False
+
+    def drop_all_task_stashes(self):
+        """Finds and drops all stashes created by Aider+ tasks."""
+        try:
+            # Use null bytes to separate fields to handle colons in messages
+            stashes_str = self.repo.git.stash("list", "--format=%gd%x00%gs")
+        except git.exc.GitCommandError:
+            return 0
+
+        if not stashes_str:
+            return 0
+
+        indices_to_drop = []
+        for line in stashes_str.splitlines():
+            if not line.strip():
+                continue
+
+            parts = line.split("\x00", 1)
+            if len(parts) != 2:
+                continue
+
+            ref, message = parts
+            if message.startswith("aider-plus-task:"):
+                match = re.match(r"stash@\{(\d+)\}", ref)
+                if match:
+                    indices_to_drop.append(int(match.group(1)))
+
+        # Drop stashes in reverse order of index to avoid re-indexing issues
+        dropped_count = 0
+        for index in sorted(indices_to_drop, reverse=True):
+            try:
+                self.repo.git.stash("drop", f"stash@{{{index}}}")
+                dropped_count += 1
+            except ANY_GIT_ERROR as err:
+                self.io.tool_error(f"Unable to drop stash at index {index}: {err}")
+
+        if dropped_count > 0:
+            self.io.tool_output(f"Dropped {dropped_count} old task stashes.")
+
+        return dropped_count
