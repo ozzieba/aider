@@ -263,6 +263,7 @@ class InputOutput:
         root=".",
         notifications=False,
         notifications_command=None,
+        tool_prompts=True,
     ):
         self.placeholder = None
         self.interrupted = False
@@ -271,6 +272,7 @@ class InputOutput:
         self.multiline_mode = multiline_mode
         self.bell_on_next_input = False
         self.notifications = notifications
+        self.tool_prompts = tool_prompts
         if notifications and notifications_command is None:
             self.notifications_command = self.get_default_notification_command()
         else:
@@ -812,6 +814,7 @@ class InputOutput:
         explicit_yes_required=False,
         group=None,
         allow_never=False,
+        tool_prompts=True,
     ):
         self.num_user_asks += 1
 
@@ -863,7 +866,9 @@ class InputOutput:
                 return True
             return text.lower() in valid_responses
 
-        if self.yes is True:
+        if not tool_prompts:
+            res = "y"
+        elif self.yes is True:
             res = "n" if explicit_yes_required else "y"
         elif self.yes is False:
             res = "n"

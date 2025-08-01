@@ -346,6 +346,7 @@ class Coder:
         auto_copy_context=False,
         auto_accept_architect=True,
         mcp_servers=None,
+        tool_prompts=True,
     ):
         # Fill in a dummy Analytics if needed, but it is never .enable()'d
         self.analytics = analytics if analytics is not None else Analytics()
@@ -361,6 +362,7 @@ class Coder:
         self.auto_copy_context = auto_copy_context
         self.auto_accept_architect = auto_accept_architect
 
+        self.tool_prompts = tool_prompts
         self.ignore_mentions = ignore_mentions
         if not self.ignore_mentions:
             self.ignore_mentions = set()
@@ -1661,7 +1663,7 @@ class Coder:
         if server_tool_calls and self.num_tool_calls < self.max_tool_calls:
             self._print_tool_call_info(server_tool_calls)
 
-            if self.io.confirm_ask("Run tools?"):
+            if self.io.confirm_ask("Run tools?", tool_prompts=self.tool_prompts):
                 tool_responses = self._execute_tool_calls(server_tool_calls)
 
                 # Add the assistant message with tool calls

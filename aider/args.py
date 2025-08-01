@@ -763,6 +763,12 @@ def get_parser(default_config_files, git_root):
         default=None,
     )
     group.add_argument(
+        "--tool-prompts",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="Enable/disable prompting before running tools (default: True)",
+    )
+    group.add_argument(
         "-v",
         "--verbose",
         action="store_true",
