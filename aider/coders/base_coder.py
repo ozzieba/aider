@@ -1664,7 +1664,7 @@ class Coder:
         if server_tool_calls and self.num_tool_calls < self.max_tool_calls:
             self._print_tool_call_info(server_tool_calls)
 
-            if not self.io.confirm_ask("Run tools?", tool_prompts=self.tool_prompts):
+            if self.tool_prompts and not self.io.confirm_ask("Run tools?"):
                 return False
 
             tool_responses = self._execute_tool_calls(server_tool_calls)
@@ -2676,7 +2676,6 @@ class Coder:
             explicit_yes_required=True,
             group=group,
             allow_never=True,
-            tool_prompts=True,
         ):
             return
 
