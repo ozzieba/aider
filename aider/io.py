@@ -273,6 +273,8 @@ class InputOutput:
         self.bell_on_next_input = False
         self.notifications = notifications
         self.tool_prompts = tool_prompts
+        # Use print because tool_output might not be ready
+        print(f"IO.__init__: self.tool_prompts={self.tool_prompts}")
         if notifications and notifications_command is None:
             self.notifications_command = self.get_default_notification_command()
         else:
@@ -816,6 +818,9 @@ class InputOutput:
         allow_never=False,
         tool_prompts=True,
     ):
+        self.tool_output(
+            f"IO.confirm_ask: self.tool_prompts={self.tool_prompts}, arg tool_prompts={tool_prompts}"
+        )
         self.num_user_asks += 1
 
         # Ring the bell if needed

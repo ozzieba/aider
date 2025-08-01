@@ -34,6 +34,9 @@ class ArchitectCoder(AskCoder):
         new_kwargs = dict(io=self.io, from_coder=self)
         new_kwargs.update(kwargs)
 
+        self.io.tool_output(
+            f"ArchitectCoder: creating editor_coder with tool_prompts={self.tool_prompts}"
+        )
         editor_coder = Coder.create(**new_kwargs)
         editor_coder.cur_messages = []
         editor_coder.done_messages = []
