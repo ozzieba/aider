@@ -1013,6 +1013,7 @@ def main(argv=None, input=None, output=None, force_git_root=None, return_coder=F
             auto_accept_architect=args.auto_accept_architect,
             mcp_servers=mcp_servers,
             add_gitignore_files=args.add_gitignore_files,
+            tool_prompts=args.tool_prompts,
         )
     except UnknownEditFormat as err:
         io.tool_error(str(err))

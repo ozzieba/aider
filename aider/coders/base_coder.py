@@ -415,7 +415,6 @@ class Coder:
             self.done_messages = []
 
         self.io = io
-        self.io.tool_output(f"Coder.__init__: tool_prompts={self.tool_prompts}")
 
         self.shell_commands = []
 
@@ -1664,9 +1663,6 @@ class Coder:
 
         if server_tool_calls and self.num_tool_calls < self.max_tool_calls:
             self._print_tool_call_info(server_tool_calls)
-            self.io.tool_output(
-                f"Coder.process_tool_calls: self.tool_prompts={self.tool_prompts}"
-            )
 
             if self.tool_prompts:
                 if not self.io.confirm_ask("Run tools?", tool_prompts=self.tool_prompts):
