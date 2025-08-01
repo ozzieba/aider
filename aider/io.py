@@ -814,7 +814,6 @@ class InputOutput:
         explicit_yes_required=False,
         group=None,
         allow_never=False,
-        tool_prompts=True,
     ):
         self.num_user_asks += 1
 
@@ -866,9 +865,7 @@ class InputOutput:
                 return True
             return text.lower() in valid_responses
 
-        if not self.tool_prompts or not tool_prompts:
-            res = "y"
-        elif self.yes is True:
+        if self.yes is True:
             res = "n" if explicit_yes_required else "y"
         elif self.yes is False:
             res = "n"
