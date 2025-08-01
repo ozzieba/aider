@@ -183,6 +183,7 @@ class Coder:
                 aider_commit_hashes=from_coder.aider_commit_hashes,
                 commands=from_coder.commands.clone(),
                 total_cost=from_coder.total_cost,
+                tool_prompts=from_coder.tool_prompts,
                 ignore_mentions=from_coder.ignore_mentions,
                 total_tokens_sent=from_coder.total_tokens_sent,
                 total_tokens_received=from_coder.total_tokens_received,
