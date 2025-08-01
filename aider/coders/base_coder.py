@@ -1664,18 +1664,21 @@ class Coder:
         if server_tool_calls and self.num_tool_calls < self.max_tool_calls:
             self._print_tool_call_info(server_tool_calls)
 
-            if self.io.confirm_ask("Run tools?", tool_prompts=self.tool_prompts):
-                tool_responses = self._execute_tool_calls(server_tool_calls)
+            if self.tool_prompts:
+                if not self.io.confirm_ask("Run tools?", tool_prompts=self.tool_prompts):
+                    return False
 
-                # Add the assistant message with tool calls
-                # Converting to a dict so it can be safely dumped to json
-                self.cur_messages.append(tool_call_response.choices[0].message.to_dict())
+            tool_responses = self._execute_tool_calls(server_tool_calls)
 
-                # Add all tool responses
-                for tool_response in tool_responses:
-                    self.cur_messages.append(tool_response)
+            # Add the assistant message with tool calls
+            # Converting to a dict so it can be safely dumped to json
+            self.cur_messages.append(tool_call_response.choices[0].message.to_dict())
 
-                return True
+            # Add all tool responses
+            for tool_response in tool_responses:
+                self.cur_messages.append(tool_response)
+
+            return True
         elif self.num_tool_calls >= self.max_tool_calls:
             self.io.tool_warning(f"Only {self.max_tool_calls} tool calls allowed, stopping.")
             return False
