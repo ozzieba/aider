@@ -1733,16 +1733,27 @@ class Coder:
                 session = await server.connect()
                 # Execute all tool calls for this server
                 for tool_call in tool_calls_list:
-                    call_result = await experimental_mcp_client.call_openai_tool(
-                        session=session,
-                        openai_tool=tool_call,
-                    )
-                    result_text = str(call_result.content[0].text)
-                    tool_responses.append(
-                        {"role": "tool", "tool_call_id": tool_call.id, "content": result_text}
-                    )
+                    try:
+                        call_result = await experimental_mcp_client.call_openai_tool(
+                            session=session,
+                            openai_tool=tool_call,
+                        )
+                        result_text = str(call_result.content[0].text)
+                        tool_responses.append(
+                            {"role": "tool", "tool_call_id": tool_call.id, "content": result_text}
+                        )
+                    except Exception as e:
+                        tool_error = f"Error executing tool call {tool_call.function.name}: \n{e}"
+                        self.io.tool_warning(f"Executing {tool_call.function.name} on {server.name} failed: \n  Error: {e}\n")
+                        tool_responses.append({"role": "tool", "tool_call_id": tool_call.id, "content": tool_error})
+            except Exception as e:
+                connection_error = f"Could not connect to server {server.name}\n{e}"
+                self.io.tool_warning(connection_error)
+                for tool_call in tool_calls_list:
+                    tool_responses.append({"role": "tool", "tool_call_id": tool_call.id, "content": connection_error})
             finally:
                 await server.disconnect()
+
             return tool_responses
 
         # Execute all tool calls concurrently
@@ -2568,7 +2579,8 @@ class Coder:
         context = ""
         if history:
             for msg in history:
-                context += "\n" + msg["role"].upper() + ": " + msg["content"] + "\n"
+                msg_content = msg.get("content") or ""
+                context += "\n" + msg["role"].upper() + ": " + msg_content + "\n"
 
         return context
 
