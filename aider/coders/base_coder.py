@@ -364,7 +364,6 @@ class Coder:
         self.auto_accept_architect = auto_accept_architect
 
         self.tool_prompts = tool_prompts
-        self.io.tool_output(f"Coder.__init__: tool_prompts={self.tool_prompts}")
         self.ignore_mentions = ignore_mentions
         if not self.ignore_mentions:
             self.ignore_mentions = set()
@@ -416,6 +415,7 @@ class Coder:
             self.done_messages = []
 
         self.io = io
+        self.io.tool_output(f"Coder.__init__: tool_prompts={self.tool_prompts}")
 
         self.shell_commands = []
 
