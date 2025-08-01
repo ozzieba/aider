@@ -866,7 +866,9 @@ class InputOutput:
                 return True
             return text.lower() in valid_responses
 
-        if not tool_prompts:
+        if not self.tool_prompts:
+            res = "y"
+        elif not tool_prompts:
             res = "y"
         elif self.yes is True:
             res = "n" if explicit_yes_required else "y"
