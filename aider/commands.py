@@ -24,7 +24,7 @@ from aider.plus.state import WorkflowState
 from aider.repo import ANY_GIT_ERROR
 from aider.run_cmd import run_cmd
 from aider.scrape import Scraper, install_playwright
-from aider.utils import is_image_file
+from aider.utils import is_image_file, split_chat_history_markdown
 
 from .dump import dump  # noqa: F401
 
@@ -1447,20 +1447,31 @@ class Commands:
         return self.completions_raw_read_only(document, complete_event)
 
     def cmd_load(self, args):
-        "Load and execute commands from a file"
+        "Load a session from a file, restoring files and conversation history"
         if not args.strip():
             self.io.tool_error("Please provide a filename containing commands to load.")
             return
 
         try:
             with open(args.strip(), "r", encoding=self.io.encoding, errors="replace") as f:
-                commands = f.readlines()
+                content = f.read()
         except FileNotFoundError:
             self.io.tool_error(f"File not found: {args}")
             return
         except Exception as e:
             self.io.tool_error(f"Error reading file: {e}")
             return
+
+        commands_part = content
+        history_part = None
+
+        separator = "\n--- AIDER CHAT HISTORY ---\n"
+        if separator in content:
+            parts = content.split(separator, 1)
+            commands_part = parts[0]
+            history_part = parts[1]
+
+        commands = commands_part.splitlines()
 
         for cmd in commands:
             cmd = cmd.strip()
@@ -1475,18 +1486,23 @@ class Commands:
                     f"Command '{cmd}' is only supported in interactive mode, skipping."
                 )
 
+        if history_part:
+            self.coder.done_messages = split_chat_history_markdown(history_part)
+            self.coder.summarize_start()
+            self.io.tool_output("Loaded chat history.")
+
     def completions_raw_save(self, document, complete_event):
         return self.completions_raw_read_only(document, complete_event)
 
     def cmd_save(self, args):
-        "Save commands to a file that can reconstruct the current chat session's files"
+        "Save commands and conversation to a file that can reconstruct the current chat session"
         if not args.strip():
             self.io.tool_error("Please provide a filename to save the commands to.")
             return
 
         try:
             with open(args.strip(), "w", encoding=self.io.encoding) as f:
-                f.write("/drop\n")
+                f.write("/reset\n")
                 # Write commands to add editable files
                 for fname in sorted(self.coder.abs_fnames):
                     rel_fname = self.coder.get_rel_fname(fname)
@@ -1501,9 +1517,15 @@ class Commands:
                     else:
                         f.write(f"/read-only {fname}\n")
 
-            self.io.tool_output(f"Saved commands to {args.strip()}")
+                if self.io.chat_history_file and self.io.chat_history_file.exists():
+                    history_content = self.io.read_text(self.io.chat_history_file)
+                    if history_content:
+                        f.write("\n--- AIDER CHAT HISTORY ---\n")
+                        f.write(history_content)
+
+            self.io.tool_output(f"Saved session to {args.strip()}")
         except Exception as e:
-            self.io.tool_error(f"Error saving commands to file: {e}")
+            self.io.tool_error(f"Error saving to file: {e}")
 
     def cmd_multiline_mode(self, args):
         "Toggle multiline mode (swaps behavior of Enter and Meta+Enter)"
