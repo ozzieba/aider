@@ -438,6 +438,7 @@ class Model(ModelSettings):
 
         if "gpt-5" in model:
             self.use_temperature = False
+            self.streaming = False
             return  # <--
 
         if "/o1-mini" in model:
