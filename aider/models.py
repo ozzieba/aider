@@ -73,6 +73,7 @@ claude-3-sonnet-20240229
 claude-3-5-sonnet-20240620
 claude-3-5-sonnet-20241022
 claude-sonnet-4-20250514
+claude-sonnet-4-5
 claude-opus-4-20250514
 """
 

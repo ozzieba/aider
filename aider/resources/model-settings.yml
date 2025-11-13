@@ -1588,6 +1588,17 @@
   editor_edit_format: editor-diff
   accepts_settings: ["thinking_tokens"]
 
+- name: vertex_ai/claude-sonnet-4-5
+  edit_format: diff
+  weak_model_name: vertex_ai/claude-4-5
+  use_repo_map: true
+  examples_as_sys_msg: false
+  extra_params:
+    max_tokens: 64000
+  editor_model_name: vertex_ai/claude-sonnet-4-5
+  editor_edit_format: editor-diff
+  accepts_settings: ["thinking_tokens"]
+
 - name: vertex_ai/claude-sonnet-4@20250514
   edit_format: diff
   weak_model_name: vertex_ai/claude-3-5-haiku@20241022
