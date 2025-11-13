@@ -241,7 +241,7 @@ jsonschema-specifications==2025.4.1
     # via jsonschema
 kiwisolver==1.4.9
     # via matplotlib
-litellm==1.75.7
+litellm==1.79.3
     # via -r requirements/requirements.in
 llama-index-core==0.13.2
     # via llama-index-embeddings-huggingface
