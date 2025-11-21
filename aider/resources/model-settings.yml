@@ -1845,6 +1845,20 @@
   accepts_settings: ["thinking_tokens"]
 
 # GPT-5 family
+- name: gpt-5.1-codex
+  edit_format: diff
+  weak_model_name: gpt-5-nano
+  use_repo_map: true
+  use_temperature: false
+  accepts_settings: ["reasoning_effort"]
+  overeager: true
+- name: gpt-5.1
+  edit_format: diff
+  weak_model_name: gpt-5-nano
+  use_repo_map: true
+  use_temperature: false
+  accepts_settings: ["reasoning_effort"]
+  overeager: true
 - name: gpt-5
   edit_format: diff
   weak_model_name: gpt-5-nano
